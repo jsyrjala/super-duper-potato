@@ -4,10 +4,22 @@
 (def next-id (let [counter (atom 0)]
                (fn [] (swap! counter inc))))
 
+(def add-system)
 
-(defn create-entity [components]
-  {:entity/id (next-id)
-   :entity/components components})
+(defn create-world
+  "Create a new, empty world"
+  []
+  (let [now (System/currentTimeMillis)
+        loop-count 0
+        world  {:world/id         true
+                :world/loop-count loop-count
+                :world/loop-times (list [loop-count now])
+                :world/entities   {}
+                :world/systems    []
+                :world/lookups    {}
+                }]
+    world
+    ))
 
 (defn create-system [name update-fn applies?]
   {
@@ -19,6 +31,10 @@
    :system/entity-id-set #{}
    }
   )
+
+(defn create-entity [components]
+  {:entity/id (next-id)
+   :entity/components components})
 
 (defn make-entity-update
   ([entity]
@@ -79,7 +95,8 @@
   ))
 
 (defn apply-system [world system]
-  (let [entity-ids (-> system :system/entity-ids)
+  (let [system-id (:system/id system)
+        entity-ids (get-in world [:world/lookups system-id :lookup/entity-ids])
         update-commands (doall (map #(update-command-for-entity-by-id world system %) entity-ids))]
     (reduce #(apply-update-command %1 system %2) world update-commands) ))
 
@@ -101,33 +118,38 @@
         new-world (reduce #(apply-system %1 %2) new-world systems)]
     new-world))
 
-(defn- add-entities-to-system [system entities]
-  ;; TODO adding entities to system is not good, they should not be part of a system?
-  ;;      makes testing systems difficult
-  ;;
+(defn add-entities-to-system-lookup [lookups system entities]
   ;; TODO if entities contains dupes, they are not handled correctly
-  ;; if system already contains entity, it is filtered correctly
-  (let [applies? (-> system :system/applies-fn)
-        entity-id-set (-> system :system/entity-id-set)
+  (let [system-id (-> system :system/id)
+        system-lookup (get lookups system-id
+                           {:lookup/entity-ids []
+                            :lookup/entity-id-set #{}})
+        entity-id-set (-> system-lookup :lookup/entity-id-set)
+        applies? (-> system :system/applies-fn)
         entities-to-add (->> entities (filter applies?))
+        e1 (nth (list entities) 0)
         entity-ids (->> entities-to-add
                         (map :entity/id)
                         (remove #(get entity-id-set %)))]
-    (cond (not (seq entity-ids)) system
-          :default (-> system
-                       (update-in [:system/entity-ids] #(into % entity-ids))
-                       (update-in [:system/entity-id-set] #(into % entity-ids))))))
+    (cond (seq entity-ids) (-> lookups
+                               (update-in [system-id :lookup/entity-ids] #(vec (into % entity-ids)))
+                               (update-in [system-id :lookup/entity-id-set] #(set (into % entity-ids))))
+          :default lookups)))
+
+(defn add-entities-to-lookups [lookups systems entities]
+  (reduce #(add-entities-to-system-lookup %1 %2 entities) lookups systems))
 
 (defn add-entities
   "Add collection of entities to world."
   [world new-entities]
-  (let [entity-map (map (fn [entity] {(-> :entity/id entity) entity}) new-entities)]
+  (let [entity-map (map (fn [entity] {(-> :entity/id entity) entity}) new-entities)
+        systems (-> world :world/systems)]
     (-> world
         (update-in [:world/entities] #(into % entity-map))
-        (update-in [:world/systems] #(map (fn [system] (add-entities-to-system system new-entities)) %))
+        (update-in [:world/lookups] #(add-entities-to-lookups % systems new-entities))
     )))
 
-
+;; TODO deprecated
 (defn- remove-entities-from-system [system entity-ids]
   (let [entity-id-set (-> system :system/entity-id-set)
         to-remove (->> entity-ids
@@ -137,36 +159,45 @@
                        (update-in [:system/entity-id-set] #(apply disj % to-remove))
                        (update-in [:system/entity-ids] #(remove (fn [id] (some #{id} to-remove)) %))))))
 
-(defn remove-entities [world entities]
-  (let [entity-ids (map :entity/id entities)]
+(defn remove-entities-from-system-lookup [lookups entities]
+  ;; TOOD
+  )
+
+(defn remove-entities
+  "Remove entities from the world"
+  [world entities]
+  (let [entity-ids (map :entity/id entities)
+        systems (-> world :world/systems)]
     (-> world
         (update-in [:world/systems] #(map (fn [system] (remove-entities-from-system system entity-ids)) %))
+        (update-in [:world/lookups] #(remove-entities-from-system-lookup % entities))
         (update-in [:world/entities] #(apply dissoc % entity-ids)))))
+
+
 
 (defn add-system
   "Add a new system to the world"
   [world system]
-  ;; TODO update entity lookups, update :world/systems
-  ;; handle case system already exists
-
-  )
-
+  ;; TODO handle case system already exists
+  (let [system-id (-> system :system/id)
+        system-name (-> system :system/name)
+        entities (-> world :world/entities vals)]
+    (-> world
+        (update-in [:world/lookups system-id]
+                   assoc :lookup/entity-id-set #{}
+                   :lookup/entity-ids []
+                   :lookup/desc system-name)
+        (update-in [:world/systems] #(conj (vec %) system))
+        (update-in [:world/lookups] #(add-entities-to-system-lookup % system entities))
+        )))
 
 (defn remove-system [world system]
-  ;; TODO remove entity lookups, remove :world/systems
-  )
-
-
-(defn create-world
-  "Create a new, empty world"
-  [systems]
-  (let [now (System/currentTimeMillis)
-        loop-count 0]
-    {:world/id         true
-     :world/loop-count loop-count
-     :world/loop-times (list [loop-count now])
-     :world/entities   {}
-     :world/systems    systems} ))
+  (let [system-id (-> system :system/id)]
+    (-> world
+        (update-in [:world/lookups] dissoc system-id)
+        (update-in [:world/systems] #(remove (fn [system]
+                                               (= system-id (:system/id system)))
+                                             %)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -249,14 +280,17 @@
 
 (def entity4 (create-entity [position]))
 
-(def world1 (create-world [moving-system drawable-system]))
+(def world0 (create-world))
+(def world1 (-> world0
+                (add-system moving-system)
+                (add-system drawable-system)))
 
 (def world2 (-> world1 (add-entities [entity1]) (add-entities [entity1 entity2])))
 
 (def current-world (atom world2))
 
 
-(defn n-updates [n]
+(defn n-updates! [n]
     (doseq [i (range 0 n)]
       (swap! current-world game-loop)
       )
