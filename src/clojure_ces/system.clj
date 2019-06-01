@@ -1,33 +1,17 @@
 (ns clojure-ces.system)
 
 
+(def next-id (let [counter (atom 0)]
+               (fn [] (swap! counter inc))))
 
-(def next-entity-id (let [counter (atom 0)]
-                      (fn [] (swap! counter inc))))
-
-
-(def next-system-id (let [counter (atom 0)]
-                      (fn [] (swap! counter inc))))
 
 (defn create-entity [components]
-  {:entity/id (next-entity-id)
+  {:entity/id (next-id)
    :entity/components components})
-
-(defn create-applies?
-  "Check if entity contains any of the components."
-  [component-types]
-  (fn [entity]
-    (let [accept (->> entity
-                      :entity/components
-                      (map :component/type)
-                      (filter #(some #{%} component-types)))
-          ]
-      (boolean (when (seq accept) entity)))))
-
 
 (defn create-system [name update-fn applies?]
   {
-   :system/id (next-entity-id)
+   :system/id (next-id)
    :system/name name
    :system/update-fn update-fn
    :system/applies-fn applies?
@@ -36,58 +20,76 @@
    }
   )
 
-
-(defn create-system2 [name update-fn applies-components]
-  (create-system name update-fn (create-applies? applies-components)))
-
-(defn update-command [result old-entity]
-  (cond (-> result :entity/id) {:system/entity result}
-        (-> result :system/entity) result
-        :default {:system/entity old-entity}))
+(defn make-entity-update
+  ([entity]
+   (make-entity-update [entity] nil nil))
+  ([updated-entities created-entities removed-entities]
+   {:entity-update/id      true
+    :entity-update/updated updated-entities
+    :entity-update/created created-entities
+    :entity-update/removed removed-entities}))
 
 (defn update-command-for-entity
   "Computes update command by system for entity"
   [world system entity]
-  (let [update-fn (-> system :system/update-fn)]
+  (let [update-fn (or (-> system :system/update-fn)
+                      (constantly world))]
     (update-fn world system entity)))
 
 (defn update-command-for-entity-by-id
   "Computes update command by system for entity id"
   [world system entity-id]
-  (println "update-entity" "id:" entity-id)
-  (let [entity (-> world :world/entities (get entity-id))]
-    (when (not entity)
-      (println "Missing entity for id. Bug somewhere:" entity-id))
-    (let [x (update-command-for-entity world system entity)]
-      (println "update-fn res" x)
-      x)
+  (let [entity (-> world :world/entities (get entity-id))
+        _ (when (not entity)
+            (println "Missing entity for id. Bug somewhere:" entity-id))
+        update-cmd (update-command-for-entity world system entity)]
+    update-cmd
     ))
+
+(defn update-entities-in-world [world system updated-entities]
+  (if updated-entities
+    (update-in world [:world/entities]
+               #(apply merge %1 %2)
+               (map (fn [entity] {(:entity/id entity) entity})
+                    updated-entities))
+    world))
+
+(defn create-entities-in-world [world system created-entities]
+  ;; TODO add to :world/entities
+  ;; add to system lookups
+  ;; warn if already exists?
+  world)
+
+(defn remove-entities-in-world [world system removed-entities]
+  ;; TODO remove from :world/entities
+  ;; remove from system lookup
+  ;; warn if not exists?
+  world)
 
 (defn apply-update-command
   "Applies update command"
-  [world system entity update-command]
-  (let [entity-id (:entity/id update-command-for-entity)]
-    (cond
-      ;; system returned an updated entity
-      entity-id (update-in world [:world/entities] assoc entity-id entity)
-
-      :default world))
-  )
+  [world system update-command]
+  (let [updated-entities (:entity-update/updated update-command)
+        created-entities (:entity-update/created update-command)
+        removed-entities (:entity-update/removed update-command)]
+    (-> world
+        (update-entities-in-world system updated-entities)
+        (create-entities-in-world system created-entities)
+        (remove-entities-in-world system removed-entities))
+  ))
 
 (defn apply-system [world system]
   (let [entity-ids (-> system :system/entity-ids)
-        update-commands (map #(update-command-for-entity-by-id world system %) entity-ids)]
-    ;; TODO update entities, removes, creates
-    (cond (nil? update-commands) world
-
-          :default world)))
+        update-commands (doall (map #(update-command-for-entity-by-id world system %) entity-ids))]
+    (reduce #(apply-update-command %1 system %2) world update-commands) ))
 
 (defn start-loop [world]
   (let [now (System/currentTimeMillis)
         loop-count (-> world :world/loop-count inc)
         loop-times (->> world :world/loop-times
-                       (take 9)
+                        (take 9)
                         (cons [loop-count now]))]
+    ;; (println "LOOP:"  loop-count  "@"  now)
     (-> world
         (update-in [:world/loop-count] (constantly loop-count))
         (update-in [:world/loop-times] (constantly loop-times)
@@ -141,20 +143,56 @@
         (update-in [:world/systems] #(map (fn [system] (remove-entities-from-system system entity-ids)) %))
         (update-in [:world/entities] #(apply dissoc % entity-ids)))))
 
-(defn create-world [systems]
-  (let [now (System/currentTimeMillis)
-        loop-count 0]
-    {
-     :world/id         true
-     :world/loop-count loop-count
-     :world/loop-times '([loop-count now])
-     :world/entities   {}
-     :world/systems    systems
-     })
+(defn add-system
+  "Add a new system to the world"
+  [world system]
+  ;; TODO update entity lookups, update :world/systems
+  ;; handle case system already exists
+
   )
 
 
+(defn remove-system [world system]
+  ;; TODO remove entity lookups, remove :world/systems
+  )
+
+
+(defn create-world
+  "Create a new, empty world"
+  [systems]
+  (let [now (System/currentTimeMillis)
+        loop-count 0]
+    {:world/id         true
+     :world/loop-count loop-count
+     :world/loop-times (list [loop-count now])
+     :world/entities   {}
+     :world/systems    systems} ))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn create-or-applies?
+  "Check if entity contains any of the components."
+  [component-types]
+  (let [types-set (set component-types)]
+    (fn [entity]
+      (let [accept (->> entity
+                        :entity/components
+                        (map :component/type)
+                        (filter #(some #{%} types-set)))
+            ]
+        (boolean (when (seq accept) entity))))))
+
+(defn create-and-applies?
+  "Check if entity contains all of the components."
+  [component-types]
+  (let [types-set (set component-types)]
+    (fn [entity]
+      (let [accept (->> entity
+                        :entity/components
+                        (map :component/type)
+                        (filter #(some #{%} types-set)))
+            ]
+        (boolean (= (set accept) types-set))))))
 
 (defn component-updater [component applies? update-fn]
   (if (applies? component)
@@ -170,26 +208,31 @@
     (let [components (-> entity :entity/components)
           component-update-fn (fn [component]
                                 (update-fn world system entity component))
-          new-components (map #(component-updater %
-                                                  (for-component-type component-type)
-                                                  component-update-fn)
-                              components)]
-      (assoc entity :entity/components new-components))))
+          new-components (vec (map #(component-updater %
+                                                       (for-component-type component-type)
+                                                       component-update-fn)
+                                   components))
+          new-entity (assoc entity :entity/components new-components)
+          update-command (make-entity-update new-entity)]
+      update-command
+      )))
 
 (defn position-update [world system entity component]
   (let [pos (:position/location component)
-        [x y] [(:x pos) (:y pos)]]
-    (assoc pos :position/location {:x (inc x) :y (inc y)})))
+        [x y] [(:x pos) (:y pos)]
+        new-component (assoc component :position/location {:x (inc x) :y (inc y)})]
+    new-component
+    ))
 
 (def update-position (update-component-with :position position-update))
 
 (def moving-system (create-system "Moving"
                                   update-position
-                                  (create-applies? [:position])))
+                                  (create-or-applies? [:position])))
 
 (def drawable-system (create-system "Drawable"
-                                  update-position
-                                  (create-applies? [:score]))
+                                    nil
+                                    (create-or-applies? [:score]))
   )
 
 (def position {:component/type :position
@@ -214,7 +257,7 @@
 
 
 (defn n-updates [n]
-    (doseq [i (range 1 n)]
+    (doseq [i (range 0 n)]
       (swap! current-world game-loop)
       )
   @current-world
