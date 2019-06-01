@@ -45,36 +45,58 @@
         (-> result :system/entity) result
         :default {:system/entity old-entity}))
 
-(defn update-entity [world system entity]
+(defn update-command-for-entity
+  "Computes update command by system for entity"
+  [world system entity]
   (let [update-fn (-> system :system/update-fn)]
     (update-fn world system entity)))
 
-(defn update-entity-by-id [world system entity-id]
+(defn update-command-for-entity-by-id
+  "Computes update command by system for entity id"
+  [world system entity-id]
   (println "update-entity" "id:" entity-id)
   (let [entity (-> world :world/entities (get entity-id))]
     (when (not entity)
       (println "Missing entity for id. Bug somewhere:" entity-id))
-    (let [x (update-entity world system entity)]
+    (let [x (update-command-for-entity world system entity)]
       (println "update-fn res" x)
       x)
     ))
 
-(defn apply-system [world system]
-  (let [entity-ids (-> system :system/entity-ids)
-        update-commands (map #(update-entity-by-id world system %) entity-ids)]
-    (println "update-comd" update-commands (nil? update-commands) entity-ids)
-    (cond (nil? update-commands) world
-          :default world)
-    )
+(defn apply-update-command
+  "Applies update command"
+  [world system entity update-command]
+  (let [entity-id (:entity/id update-command-for-entity)]
+    (cond
+      ;; system returned an updated entity
+      entity-id (update-in world [:world/entities] assoc entity-id entity)
+
+      :default world))
   )
 
+(defn apply-system [world system]
+  (let [entity-ids (-> system :system/entity-ids)
+        update-commands (map #(update-command-for-entity-by-id world system %) entity-ids)]
+    ;; TODO update entities, removes, creates
+    (cond (nil? update-commands) world
+
+          :default world)))
+
+(defn start-loop [world]
+  (let [now (System/currentTimeMillis)
+        loop-count (-> world :world/loop-count inc)
+        loop-times (->> world :world/loop-times
+                       (take 9)
+                        (cons [loop-count now]))]
+    (-> world
+        (update-in [:world/loop-count] (constantly loop-count))
+        (update-in [:world/loop-times] (constantly loop-times)
+        ))))
+
 (defn game-loop [world]
-  (let [systems (-> world :world/systems)
-        _ (println "game-loop systems" (count systems))
-        ;; TODO
-        new-world (map #(apply-system world %) (-> world :world/systems))
-        ;;new-world (reduce #(apply-system world %) (-> world :world/systems))
-        ]
+  (let [new-world (start-loop world)
+        systems (-> world :world/systems)
+        new-world (reduce #(apply-system %1 %2) new-world systems)]
     new-world))
 
 (defn- add-entities-to-system [system entities]
@@ -120,10 +142,15 @@
         (update-in [:world/entities] #(apply dissoc % entity-ids)))))
 
 (defn create-world [systems]
-  {
-   :world/entities {}
-   :world/systems systems
-   }
+  (let [now (System/currentTimeMillis)
+        loop-count 0]
+    {
+     :world/id         true
+     :world/loop-count loop-count
+     :world/loop-times '([loop-count now])
+     :world/entities   {}
+     :world/systems    systems
+     })
   )
 
 
@@ -152,7 +179,7 @@
 (defn position-update [world system entity component]
   (let [pos (:position/location component)
         [x y] [(:x pos) (:y pos)]]
-    (assoc position :position/location {:x (inc x) :y (inc y)})))
+    (assoc pos :position/location {:x (inc x) :y (inc y)})))
 
 (def update-position (update-component-with :position position-update))
 
@@ -179,6 +206,16 @@
 
 (def entity4 (create-entity [position]))
 
-(def world (create-world [moving-system drawable-system]))
+(def world1 (create-world [moving-system drawable-system]))
 
-(def world2 (-> world (add-entities [entity1]) (add-entities [entity1 entity2])))
+(def world2 (-> world1 (add-entities [entity1]) (add-entities [entity1 entity2])))
+
+(def current-world (atom world2))
+
+
+(defn n-updates [n]
+    (doseq [i (range 1 n)]
+      (swap! current-world game-loop)
+      )
+  @current-world
+  )
