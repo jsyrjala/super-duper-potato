@@ -4,8 +4,6 @@
 (def next-id (let [counter (atom 0)]
                (fn [] (swap! counter inc))))
 
-(def add-system)
-
 (defn create-world
   "Create a new, empty world"
   []
@@ -43,80 +41,7 @@
     :entity-update/created created-entities
     :entity-update/removed removed-entities}))
 
-(defn update-command-for-entity
-  "Computes update command by system for entity"
-  [world system entity]
-  (let [update-fn (or (-> system :system/update-fn)
-                      (constantly world))]
-    (update-fn world system entity)))
-
-(defn update-command-for-entity-by-id
-  "Computes update command by system for entity id"
-  [world system entity-id]
-  (let [entity (-> world :world/entities (get entity-id))
-        _ (when (not entity)
-            (println "Missing entity for id. Bug somewhere:" entity-id))
-        update-cmd (update-command-for-entity world system entity)]
-    update-cmd
-    ))
-
-(defn update-entities-in-world [world system updated-entities]
-  ;; TODO entity may obtain or remove components? Should check against system applies?
-  (if updated-entities
-    (update-in world [:world/entities]
-               #(apply merge %1 %2)
-               (map (fn [entity] {(:entity/id entity) entity})
-                    updated-entities))
-    world))
-
-(defn create-entities-in-world [world system created-entities]
-  ;; TODO add to :world/entities
-  ;; add to system lookups
-  ;; warn if already exists?
-  world)
-
-(defn remove-entities-in-world [world system removed-entities]
-  ;; TODO remove from :world/entities
-  ;; remove from system lookup
-  ;; warn if not exists?
-  world)
-
-(defn apply-update-command
-  "Applies update command"
-  [world system update-command]
-  (let [updated-entities (:entity-update/updated update-command)
-        created-entities (:entity-update/created update-command)
-        removed-entities (:entity-update/removed update-command)]
-    (-> world
-        (update-entities-in-world system updated-entities)
-        (create-entities-in-world system created-entities)
-        (remove-entities-in-world system removed-entities))
-  ))
-
-(defn apply-system [world system]
-  (let [system-id (:system/id system)
-        entity-ids (get-in world [:world/lookups system-id :lookup/entity-ids])
-        update-commands (doall (map #(update-command-for-entity-by-id world system %) entity-ids))]
-    (reduce #(apply-update-command %1 system %2) world update-commands) ))
-
-(defn- start-loop [world]
-  (let [now (System/currentTimeMillis)
-        loop-count (-> world :world/loop-count inc)
-        loop-times (->> world :world/loop-times
-                        (take 9)
-                        (cons [loop-count now]))]
-    ;; (println "LOOP:"  loop-count  "@"  now)
-    (-> world
-        (update-in [:world/loop-count] (constantly loop-count))
-        (update-in [:world/loop-times] (constantly loop-times)
-        ))))
-
-(defn game-loop [world]
-  (let [new-world (start-loop world)
-        systems (-> world :world/systems)
-        new-world (reduce #(apply-system %1 %2) new-world systems)]
-    new-world))
-
+;; Add and remove entities
 (defn- add-entities-to-system-lookup [lookups system entities]
   ;; TODO if entities contains dupes, they are not handled correctly
   (let [system-id (-> system :system/id)
@@ -172,6 +97,7 @@
         (update-in [:world/lookups] #(remove-entities-from-lookup % systems entities))
         (update-in [:world/entities] #(apply dissoc % entity-ids)))))
 
+;; Add and remove systems
 (defn add-system
   "Add a new system to the world"
   [world system]
@@ -198,6 +124,76 @@
         (update-in [:world/systems] #(remove (fn [system]
                                                (= system-id (:system/id system)))
                                              %)))))
+;; Game loop
+(defn update-command-for-entity
+  "Computes update command by system for entity"
+  [world system entity]
+  (let [update-fn (or (-> system :system/update-fn)
+                      (constantly world))]
+    (update-fn world system entity)))
+
+(defn update-command-for-entity-by-id
+  "Computes update command by system for entity id"
+  [world system entity-id]
+  (let [entity (-> world :world/entities (get entity-id))
+        _ (when (not entity)
+            (println "Missing entity for id. Bug somewhere:" entity-id))
+        update-cmd (update-command-for-entity world system entity)]
+    update-cmd
+    ))
+
+(defn update-entities-in-world [world system updated-entities]
+  ;; TODO entity may obtain or remove components? Should check against system applies?
+  (if updated-entities
+    (update-in world [:world/entities]
+               #(apply merge %1 %2)
+               (map (fn [entity] {(:entity/id entity) entity})
+                    updated-entities))
+    world))
+
+(defn create-entities-in-world [world system created-entities]
+  ;; warn if already exists?
+  (add-entities world created-entities))
+
+(defn remove-entities-in-world [world system removed-entities]
+  ;; warn if not exists?
+  (remove-entities world removed-entities))
+
+(defn apply-update-command
+  "Applies update command"
+  [world system update-command]
+  (let [updated-entities (:entity-update/updated update-command)
+        created-entities (:entity-update/created update-command)
+        removed-entities (:entity-update/removed update-command)]
+    (-> world
+        (update-entities-in-world system updated-entities)
+        (create-entities-in-world system created-entities)
+        (remove-entities-in-world system removed-entities))
+    ))
+
+(defn apply-system [world system]
+  (let [system-id (:system/id system)
+        entity-ids (get-in world [:world/lookups system-id :lookup/entity-ids])
+        update-commands (doall (map #(update-command-for-entity-by-id world system %) entity-ids))]
+    (reduce #(apply-update-command %1 system %2) world update-commands) ))
+
+(defn- start-loop [world]
+  (let [now (System/currentTimeMillis)
+        loop-count (-> world :world/loop-count inc)
+        loop-times (->> world :world/loop-times
+                        (take 9)
+                        (cons [loop-count now]))]
+    ;; (println "LOOP:"  loop-count  "@"  now)
+    (-> world
+        (update-in [:world/loop-count] (constantly loop-count))
+        (update-in [:world/loop-times] (constantly loop-times)
+                   ))))
+
+(defn game-loop [world]
+  (let [new-world (start-loop world)
+        systems (-> world :world/systems)
+        new-world (reduce #(apply-system %1 %2) new-world systems)]
+    new-world))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -255,6 +251,16 @@
     new-component
     ))
 
+(defn aging-update [world system entity]
+  (let [aging (-> entity :entity/components
+                  (filter :aging))
+        hitpoints (-> aging :aging/hitpoints)
+        ]
+    (if (< hitpoints 1)
+
+      (update-in aging [:aging/hitpoints] dec))
+    ))
+
 (def update-position (update-component-with :position position-update))
 
 (def moving-system (create-system "Moving"
@@ -263,8 +269,14 @@
 
 (def drawable-system (create-system "Drawable"
                                     nil
-                                    (create-or-applies? [:score]))
-  )
+                                    (create-or-applies? [:score])))
+
+(def aging-system (create-system "Moving"
+                                  update-aging
+                                  (create-or-applies? [:aging])))
+
+(def aging {:component/type :aging
+            :aging/hitpoints 10})
 
 (def position {:component/type :position
                :position/location {:x 1 :y 0}})
@@ -273,12 +285,12 @@
             :score/score 0})
 
 
-(def entity1 (create-entity [position score]))
+(def entity1 (create-entity [position score living]))
 
-(def entity2 (create-entity [position]))
-(def entity3 (create-entity [position]))
+(def entity2 (create-entity [position living]))
+(def entity3 (create-entity [position living]))
 
-(def entity4 (create-entity [position]))
+(def entity4 (create-entity [position living]))
 
 (def world0 (create-world))
 (def world1 (-> world0
