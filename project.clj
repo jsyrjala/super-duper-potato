@@ -5,5 +5,10 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [org.clojure/tools.logging "0.4.1"]
-                 [ch.qos.logback/logback-classic "1.2.3"]]
+                 [ch.qos.logback/logback-classic "1.2.3"]
+                 ]
+  :profiles {:dev {:dependencies [
+                                  [criterium "0.4.5"]
+                                  ]
+                   }}
   :repl-options {:init-ns clojure-ces.core})
