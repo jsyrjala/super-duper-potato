@@ -27,8 +27,6 @@
    :system/name name
    :system/update-fn update-fn
    :system/applies-fn applies?
-   :system/entity-ids  []
-   :system/entity-id-set #{}
    }
   )
 
@@ -63,6 +61,7 @@
     ))
 
 (defn update-entities-in-world [world system updated-entities]
+  ;; TODO entity may obtain or remove components? Should check against system applies?
   (if updated-entities
     (update-in world [:world/entities]
                #(apply merge %1 %2)
@@ -100,7 +99,7 @@
         update-commands (doall (map #(update-command-for-entity-by-id world system %) entity-ids))]
     (reduce #(apply-update-command %1 system %2) world update-commands) ))
 
-(defn start-loop [world]
+(defn- start-loop [world]
   (let [now (System/currentTimeMillis)
         loop-count (-> world :world/loop-count inc)
         loop-times (->> world :world/loop-times
@@ -118,7 +117,7 @@
         new-world (reduce #(apply-system %1 %2) new-world systems)]
     new-world))
 
-(defn add-entities-to-system-lookup [lookups system entities]
+(defn- add-entities-to-system-lookup [lookups system entities]
   ;; TODO if entities contains dupes, they are not handled correctly
   (let [system-id (-> system :system/id)
         system-lookup (get lookups system-id
@@ -127,7 +126,6 @@
         entity-id-set (-> system-lookup :lookup/entity-id-set)
         applies? (-> system :system/applies-fn)
         entities-to-add (->> entities (filter applies?))
-        e1 (nth (list entities) 0)
         entity-ids (->> entities-to-add
                         (map :entity/id)
                         (remove #(get entity-id-set %)))]
@@ -136,7 +134,7 @@
                                (update-in [system-id :lookup/entity-id-set] #(set (into % entity-ids))))
           :default lookups)))
 
-(defn add-entities-to-lookups [lookups systems entities]
+(defn- add-entities-to-lookups [lookups systems entities]
   (reduce #(add-entities-to-system-lookup %1 %2 entities) lookups systems))
 
 (defn add-entities
@@ -149,19 +147,21 @@
         (update-in [:world/lookups] #(add-entities-to-lookups % systems new-entities))
     )))
 
-;; TODO deprecated
-(defn- remove-entities-from-system [system entity-ids]
-  (let [entity-id-set (-> system :system/entity-id-set)
-        to-remove (->> entity-ids
+(defn- remote-entities-from-system-lookup [lookups system entities]
+  (let [system-id (-> system :system/id)
+        system-lookup (get lookups system-id)
+        entity-id-set (-> system-lookup :lookup/entity-id-set)
+        to-remove (->> entities
+                       (map :entity/id)
                        (filter #(get entity-id-set %)))]
-    (cond (not (seq to-remove)) system
-          :default (-> system
-                       (update-in [:system/entity-id-set] #(apply disj % to-remove))
-                       (update-in [:system/entity-ids] #(remove (fn [id] (some #{id} to-remove)) %))))))
+    (cond to-remove
+          (-> lookups
+              (update-in [system-id :lookup/entity-id-set] #(apply disj % to-remove))
+              (update-in [system-id :lookup/entity-ids] #(remove (fn [id] (some #{id} to-remove)) %)))
+          :default lookups)))
 
-(defn remove-entities-from-system-lookup [lookups entities]
-  ;; TOOD
-  )
+(defn- remove-entities-from-lookup [lookups systems entities]
+  (reduce #(remote-entities-from-system-lookup %1 %2 entities) lookups systems))
 
 (defn remove-entities
   "Remove entities from the world"
@@ -169,11 +169,8 @@
   (let [entity-ids (map :entity/id entities)
         systems (-> world :world/systems)]
     (-> world
-        (update-in [:world/systems] #(map (fn [system] (remove-entities-from-system system entity-ids)) %))
-        (update-in [:world/lookups] #(remove-entities-from-system-lookup % entities))
+        (update-in [:world/lookups] #(remove-entities-from-lookup % systems entities))
         (update-in [:world/entities] #(apply dissoc % entity-ids)))))
-
-
 
 (defn add-system
   "Add a new system to the world"
@@ -184,14 +181,17 @@
         entities (-> world :world/entities vals)]
     (-> world
         (update-in [:world/lookups system-id]
-                   assoc :lookup/entity-id-set #{}
+                   assoc
+                   :lookup/entity-id-set #{}
                    :lookup/entity-ids []
                    :lookup/desc system-name)
         (update-in [:world/systems] #(conj (vec %) system))
         (update-in [:world/lookups] #(add-entities-to-system-lookup % system entities))
         )))
 
-(defn remove-system [world system]
+(defn remove-system
+  "Remove system from the world"
+  [world system]
   (let [system-id (-> system :system/id)]
     (-> world
         (update-in [:world/lookups] dissoc system-id)
