@@ -139,6 +139,7 @@
                       (constantly world))
         update-command (update-fn world system entity)]
     (cond
+      (nil? update-command) nil
       ;; returned directly an updated entity
       (update-command :entity/id) (make-entity-update update-command)
       ;; assumed to contain structure created by make-entity-update
@@ -245,6 +246,11 @@
 (defn for-component-type [type]
   (fn [component]
     (= (:component/type component) type)))
+
+(defn first-component [entity type]
+  (->> (-> entity :entity/components)
+       (filter (for-component-type type))
+       first))
 
 (defn components-updater [components component-type update-fn]
   (vec (map #(component-updater %
