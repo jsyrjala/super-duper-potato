@@ -9,25 +9,21 @@
   []
   (let [now (System/currentTimeMillis)
         loop-count 0
-        world  {:world/id         true
-                :world/loop-count loop-count
-                :world/loop-times (list [loop-count now])
-                :world/entities   {}
-                :world/systems    []
-                :world/lookups    {}
-                }]
-    world
-    ))
+        world {:world/id         true
+               :world/loop-count loop-count
+               :world/loop-times (list [loop-count now])
+               :world/entities   {}
+               :world/systems    []
+               :world/lookups    {} }]
+    world))
 
-(defn create-system [name update-fn applies?]
+(defn create-system
+  [name update-fn applies-fn]
   {
    :system/id (next-id)
    :system/name name
    :system/update-fn update-fn
-   :system/applies-fn applies?
-   }
-  )
-
+   :system/applies-fn applies-fn })
 
 (defn- to-vec [value]
   (cond (nil? value) nil
@@ -41,7 +37,7 @@
 
 (defn make-entity-update
   ([entity]
-   (make-entity-update (to-vec entity) nil nil))
+   (make-entity-update entity nil nil))
   ([updated-entities created-entities removed-entities]
    {:entity-update/id      true
     :entity-update/updated (to-vec updated-entities)
@@ -49,6 +45,7 @@
     :entity-update/removed (to-vec removed-entities) }))
 
 ;; Add and remove entities
+
 (defn- add-entities-to-system-lookup [lookups system entities]
   ;; TODO if entities contains dupes, they are not handled correctly
   (let [system-id (-> system :system/id)
@@ -105,6 +102,7 @@
         (update-in [:world/entities] #(apply dissoc % entity-ids)))))
 
 ;; Add and remove systems
+
 (defn add-system
   "Add a new system to the world"
   [world system]
@@ -131,7 +129,9 @@
         (update-in [:world/systems] #(remove (fn [system]
                                                (= system-id (:system/id system)))
                                              %)))))
+
 ;; Game loop
+
 (defn update-command-for-entity
   "Computes update command by system for entity"
   [world system entity]
@@ -141,8 +141,8 @@
     (cond
       ;; returned directly an updated entity
       (update-command :entity/id) (make-entity-update update-command)
-      :default update-command)
-    ))
+      ;; assumed to contain structure created by make-entity-update
+      :default update-command) ))
 
 (defn update-command-for-entity-by-id
   "Computes update command by system for entity id"
@@ -151,11 +151,11 @@
         _ (when (not entity)
             (println "Missing entity for id. Bug somewhere:" entity-id))
         update-cmd (update-command-for-entity world system entity)]
-    update-cmd
-    ))
+    update-cmd ))
 
 (defn update-entities-in-world [world system updated-entities]
-  ;; TODO entity may obtain or remove components? Should check against system applies?
+  ;; TODO Does not support adding/removing components. Lookups for systems are not updated.
+  ;; TODO check against old version to see if the components have changed and then run system applies?
   (if (seq updated-entities)
     (update-in world [:world/entities]
                #(apply merge %1 %2)
@@ -211,9 +211,9 @@
         new-world (reduce #(apply-system %1 %2) new-world systems)]
     new-world))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; helper functions
 
-(defn create-or-applies?
+(defn contains-any-components?
   "Check if entity contains any of the components."
   [component-types]
   (let [types-set (set component-types)]
@@ -225,7 +225,7 @@
             ]
         (boolean (when (seq accept) entity))))))
 
-(defn create-and-applies?
+(defn contains-all-components?
   "Check if entity contains all of the components."
   [component-types]
   (let [types-set (set component-types)]
@@ -260,7 +260,9 @@
                                  components))]
         (assoc entity :entity/components new-components)))
 
-(defn update-component-with [component-type update-fn]
+(defn update-component-with
+  "Creates a function to update contents of a single component."
+  [component-type update-fn]
   (fn [world system entity]
     (let [components (-> entity :entity/components)
           component-update-fn (fn [component]
@@ -272,104 +274,104 @@
       )))
 
 
-;;;;
+;;;; test/app code
+
+#_(do
+  (defn aging [age]
+    {:component/type  :aging
+     :aging/hitpoints age})
+
+  (defn position
+    [x y]
+    {:component/type    :position
+     :position/location {:x x :y y}})
+
+  (defn score [score]
+    {:component/type :score
+     :score/score    score})
+
+  (defn cloning [timeout]
+    {:component/type      :cloning
+     :cloning/timeout     timeout
+     :cloning/max-timeout timeout})
+
+  ;; example of simple single component updater
+  (defn position-update [world system entity component]
+    (let [pos (:position/location component)
+          [x y] [(:x pos) (:y pos)]
+          new-component (assoc component :position/location {:x (inc x) :y (inc y)})]
+      new-component))
+
+  (def update-position (update-component-with :position position-update))
+
+  ;; example of updater that can remove the current entity
+  (defn update-aging [world system entity]
+    (let [aging (->> entity :entity/components
+                     (filter (for-component-type :aging))
+                     first)
+          hitpoints (-> aging :aging/hitpoints)]
+      (if (<= hitpoints 1)
+        (make-entity-update nil nil [entity])
+        (update-component entity :aging #(update-in % [:aging/hitpoints] dec))
+        )))
+
+  (defn update-cloning [world system entity]
+    (let [component (->> entity :entity/components
+                         (filter (for-component-type :cloning))
+                         first)
+          max-timeout (-> component :cloning/max-timeout)
+          timeout (-> component :cloning/timeout)]
+      (if (<= timeout 1)
+        (let [reset-entity (update-component entity :cloning #(update-in % [:cloning/timeout] (constantly max-timeout)))
+              cloned-entity1 (create-entity [(aging 21)])
+              cloned-entity2 (create-entity (aging 21))]
+          (make-entity-update reset-entity [cloned-entity1 cloned-entity2] nil))
+        (update-component entity :cloning #(update-in % [:cloning/timeout] dec))
+        )))
+
+  (def moving-system (create-system "Moving"
+                                    update-position
+                                    (contains-all-components? [:position])))
+
+  (def drawable-system (create-system "Drawable"
+                                      nil
+                                      (contains-all-components? [:score])))
+
+  (def aging-system (create-system "Aging"
+                                   update-aging
+                                   (contains-all-components? [:aging])))
+
+  (def cloning-system (create-system "Cloning"
+                                     update-cloning
+                                     (contains-all-components? [:cloning])))
 
 
-(defn aging [age]
-  {:component/type :aging
-   :aging/hitpoints age})
+  (def entity1 (create-entity [(position 0 0)
+                               (score 0)
+                               (cloning 10)]))
 
-(defn position
-  [x y]
-  {:component/type :position
-   :position/location {:x x :y y}})
+  (def entity2 (create-entity [(position 1 1)
+                               (aging 10)]))
+  (def entity3 (create-entity [(position 1 0)
+                               (aging 3)]))
 
-(defn score [score]
-  {:component/type :score
-   :score/score score})
+  (def entity4 (create-entity [(position 0 1)
+                               (aging 7)]))
 
-(defn cloning [timeout]
-  {:component/type :cloning
-   :cloning/timeout timeout
-   :cloning/max-timeout timeout})
+  (def world0 (create-world))
+  (def world1 (-> world0
+                  (add-system moving-system)
+                  (add-system drawable-system)
+                  (add-system aging-system)
+                  (add-system cloning-system)))
 
-(defn position-update [world system entity component]
-  (let [pos (:position/location component)
-        [x y] [(:x pos) (:y pos)]
-        new-component (assoc component :position/location {:x (inc x) :y (inc y)})]
-    new-component
-    ))
+  (def world2 (-> world1 (add-entities [entity1]) (add-entities [entity1 entity2 entity3])))
 
-(defn update-aging [world system entity]
-  (let [aging (->> entity :entity/components
-                  (filter (for-component-type :aging))
-                   first)
-        hitpoints (-> aging :aging/hitpoints)]
-    (if (<= hitpoints 1)
-      (make-entity-update nil nil [entity])
-      (update-component entity :aging #(update-in % [:aging/hitpoints] dec))
-    )))
+  (def current-world (atom world2))
 
-(defn update-cloning [world system entity]
-  (let [component (->> entity :entity/components
-                   (filter (for-component-type :cloning))
-                   first)
-        max-timeout (-> component :cloning/max-timeout)
-        timeout (-> component :cloning/timeout)
-        ]
-    (if (<= timeout 1)
-      (let [reset-entity (update-component entity :cloning #(update-in % [:cloning/timeout] (constantly max-timeout)))
-            cloned-entity (create-entity (aging 7))]
-        (make-entity-update reset-entity cloned-entity nil))
-      (update-component entity :cloning #(update-in % [:cloning/timeout] dec))
-      )))
-
-(def update-position (update-component-with :position position-update))
-
-(def moving-system (create-system "Moving"
-                                  update-position
-                                  (create-or-applies? [:position])))
-
-(def drawable-system (create-system "Drawable"
-                                    nil
-                                    (create-or-applies? [:score])))
-
-(def aging-system (create-system "Aging"
-                                 update-aging
-                                  (create-or-applies? [:aging])))
-
-(def cloning-system (create-system "Cloning"
-                                   update-cloning
-                                   (create-or-applies? [:cloning])))
-
-
-(def entity1 (create-entity [(position 0 0)
-                             (score 0)
-                             (cloning 10)]))
-
-(def entity2 (create-entity [(position 1 1)
-                             (aging 10)]))
-(def entity3 (create-entity [(position 1 0)
-                             (aging 3)]))
-
-(def entity4 (create-entity [(position 0 1)
-                             (aging 7)]))
-
-(def world0 (create-world))
-(def world1 (-> world0
-                (add-system moving-system)
-                (add-system drawable-system)
-                (add-system aging-system)
-                (add-system cloning-system)))
-
-(def world2 (-> world1 (add-entities [entity1]) (add-entities [entity1 entity2 entity3])))
-
-(def current-world (atom world2))
-
-
-(defn n-updates! [n]
+  (defn n-updates! [n]
     (doseq [i (range 0 n)]
-      (swap! current-world game-loop)
-      )
-  @current-world
+      (swap! current-world game-loop))
+    @current-world)
+
   )
