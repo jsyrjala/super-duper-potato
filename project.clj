@@ -6,9 +6,44 @@
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [org.clojure/tools.logging "0.4.1"]
                  [ch.qos.logback/logback-classic "1.2.3"]
+
+                 [play-cljc "0.3.0"]
+
+                 [nrepl "0.6.0"]
+
+                 [org.lwjgl/lwjgl "3.2.2"]
+                 [org.lwjgl/lwjgl "3.2.2"
+                  :classifier "natives-macos"
+                  ;;:native-prefix ""
+                  ]
+
+                 [org.lwjgl/lwjgl-glfw "3.2.2"]
+                 [org.lwjgl/lwjgl-glfw "3.2.2"
+                  :classifier "natives-macos"
+                  ;;:native-prefix ""
+                  ]
+
+                 [org.lwjgl/lwjgl-opengl "3.2.2"]
+                 [org.lwjgl/lwjgl-opengl "3.2.2"
+                  :classifier "natives-macos"
+                  ;;:native-prefix ""
+                  ]
+
+                 [org.lwjgl/lwjgl-stb "3.2.2"]
+                 [org.lwjgl/lwjgl-stb "3.2.2"
+                  :classifier "natives-macos"
+                  ;;:native-prefix ""
+                  ]
                  ]
   :profiles {:dev {:dependencies [
                                   [criterium "0.4.5"]
                                   ]
-                   }}
-  :repl-options {:init-ns clojure-ces.core})
+                   }
+            }
+  :jvm-opts ["-XX:+PrintCommandLineFlags"
+             "-XstartOnFirstThread"
+             ]
+  :repl-options {:init-ns  clojure-ces.example.input
+                 }
+  :main clojure-ces.example.input/start
+  )
