@@ -20,14 +20,18 @@
 
 (defn create-system
   "Create a system
-  update-fn:
-  applies-fn:"
-  [name update-fn applies-fn]
-  {
-   :system/id (next-id)
-   :system/name name
-   :system/update-fn update-fn
-   :system/applies-fn applies-fn })
+  update-fn: computes update for given entity
+  applies-fn: checks if given entity is managed by this system"
+  ([name update-fn applies-fn]
+   (create-system name update-fn applies-fn {})
+   )
+  ([name update-fn applies-fn data]
+   (merge
+     {:system/id         (next-id)
+      :system/name       name
+      :system/update-fn  update-fn
+      :system/applies-fn applies-fn}
+     data)))
 
 (defn- to-vec [value]
   (cond (nil? value) nil
