@@ -7,6 +7,8 @@
            )
   (:gen-class))
 
+(def text (atom "some text"))
+
 ;; https://stackoverflow.com/questions/38573470/make-a-class-that-extends-a-class-with-overriding-in-clojure
 (defn make-screen [name render-fn]
   (proxy [Screen]
@@ -19,7 +21,7 @@
   (let [x 5.0
         y 10.0]
     (.setColor g Color/RED)
-    (RenderEngine/renderText g "my text" x y)))
+    (RenderEngine/renderText g (str @text "ttt") x y)))
 
 (defn start-engine [args]
   (log/info "start" args)
@@ -35,7 +37,7 @@
                           (terminated [_]
                             (log/info "Gamelistener terminated"))
                           ))
-  (let [screen (make-screen "hii" draw-something)]
+  (let [screen (make-screen "draw-something" draw-something)]
     (.add (Game/screens) screen))
 
   (Game/start)
