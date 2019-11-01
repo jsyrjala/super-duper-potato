@@ -21,6 +21,6 @@
              ]
   ;; :repl-options {:init-ns  clojure-ces.example.input}
   ;; :main clojure-ces.example.input/start
-  :main clojure-ces.example.litiengine
+  :main clojure-ces.example.game
 
   )
