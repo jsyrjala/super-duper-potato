@@ -1,26 +1,11 @@
 (ns clojure-ces.example.asteroid
   (:require [clojure-ces.system :as system]
+            [clojure-ces.example.vector :as vector]
             [clojure.tools.logging :as log])
+
   )
 
 ;; vectors stuff
-
-(defn vector2 [x y]
-  [x y])
-
-(defn number [value]
-  (or value 0))
-
-;; TODO very much assumes 2 component vectors
-(defn vector-add2 [v1 v2]
-  {:pre [(vector? v1)
-         (= (count v1) 2)
-         (vector? v2)
-         (= (count v2) 2)]}
-  (let [[x1 y1] (or v1 [0 0])
-        [x2 y2] (or v2 [0 0])]
-    [(+ (number x1) (number x2))
-     (+ (number y1) (number y2))]))
 
 (def graphics)
 
@@ -37,14 +22,41 @@
         velocity (:movement/velocity movement)]
     ;(log/info "position update" (:entity/id entity) position velocity)
     (assoc component :position/position
-                     (vector-add2 position velocity))))
+                     (vector/add position velocity))))
+
+
+
+(defn point-gravity-update [world system entity component]
+  (let [position-c (system/first-component entity :position)
+        position (:position/position position-c)
+        velocity (:movement/velocity component)
+        speed (vector/length velocity)
+        center (:gravity/center system)
+        min-distance (:gravity/min-distance system)
+        e-name (:named/name (system/first-component entity :named))
+        mass (* 100 (:gravity/mass system))
+        entity-mass 1.0
+        dist (max min-distance (vector/distance position center))
+        force (/ (* entity-mass mass) (* dist dist))
+        direction (vector/add position (vector/negate center))
+        unit-direction (vector/normalize direction)
+        change (vector/clamp (vector/negate (vector/scale unit-direction force)) 5.0)
+        ]
+    (when (= e-name "player")
+      (log/info e-name "gravity" position "s=" speed "d=" dist "f=" force change))
+    (assoc component :movement/acceleration change)))
+
+(defn constant-gravity-update [world system entity component]
+  (let [acceleration (:movement/acceleration component)
+        force (:gravity/constant-force system)]
+    ;;(log/info "position update" (:entity/id entity) component)
+    (assoc component :movement/acceleration force)))
 
 (defn gravity-update [world system entity component]
-  (let [acceleration (:movement/acceleration component)
-        force (:gravity/force system)]
-    ;;(log/info "position update" (:entity/id entity) component)
-    (assoc component :movement/acceleration
-                     (vector-add2 acceleration force))))
+  ;;component
+  (constant-gravity-update world system entity component)
+  ;; (point-gravity-update world system entity component)
+  )
 
 
 (def drawable-system
@@ -58,7 +70,10 @@
     "Gravity"
     (system/update-component-with :movement gravity-update)
     (system/contains-all-components? [:movement :position])
-    {:gravity/force [0 0.001]}))
+    {:gravity/constant-force [0 0.1]
+     :gravity/center         [0.0 0.0]
+     :gravity/min-distance   10
+     :gravity/mass           1.0}))
 
 (defn newton-update [world system entity]
   (let [position-c (system/first-component entity :position)
@@ -66,8 +81,11 @@
         position (:position/position position-c)
         velocity (:movement/velocity movement)
         acceleration (:movement/acceleration movement)
-        new-velocity (vector-add2 velocity acceleration)
-        new-position (vector-add2 position new-velocity)]
+        ;; _ (log/info "pos" position "vel" velocity "acc" acceleration)
+        new-velocity (vector/add velocity acceleration)
+        new-position (vector/add position new-velocity)
+        ;;_ (log/info "pos" new-position "vel" new-velocity)
+        ]
     (-> entity
         (system/update-component :position
                                  (fn newton-pos-up [component]
@@ -88,48 +106,48 @@
 
 (defn named [name]
   {:component/type :named
-   :named/name name})
+   :named/name     name})
 
 (defn position [pos direction]
-  {:component/type    :position
-   :position/position pos
+  {:component/type     :position
+   :position/position  pos
    :position/direction direction})
 
 (defn movement [velocity acceleration]
-  {:component/type :movement
-   :movement/velocity velocity
+  {:component/type        :movement
+   :movement/velocity     velocity
    :movement/acceleration acceleration})
 
 (defn drawable [sprite]
-  {:component/type :drawable
+  {:component/type  :drawable
    :drawable/sprite sprite})
 
 
 (defn score [score lives]
-  {:component/type  :score
-   :score/score score
-   :score/lives lives})
+  {:component/type :score
+   :score/score    score
+   :score/lives    lives})
 
 ;; entities
 (def player (system/create-entity
               [(named "player")
-               (position (vector2 0 0) 0)
-               (movement (vector2 0 0) (vector2 0 0))
+               (position (vector/vector2 30 30) 0)
+               (movement (vector/vector2 0 0) (vector/vector2 0 0))
                (drawable :player)
                (score 0 3)]))
 
 
 (def bullet (system/create-entity
               [(named "bullet")
-               (position (vector2 1 2) 0)
-               (movement (vector2 0.1 0.1) (vector2 0 0))
+               (position (vector/vector2 1 2) 0)
+               (movement (vector/vector2 0.1 0.1) (vector/vector2 0 0))
                (drawable :bullet)]))
 
 
 (def asteroid (system/create-entity
                 [(named "asteroid")
-                 (position (vector2 1 1) 0)
-                 (movement (vector2 0 0) (vector2 0 0))
+                 (position (vector/vector2 1 1) 0)
+                 (movement (vector/vector2 0 0) (vector/vector2 0 0))
                  (drawable :asteroid)
                  ]))
 
