@@ -42,7 +42,7 @@
 (defn gravity-update [world system entity component]
   (let [acceleration (:movement/acceleration component)
         force (:gravity/force system)]
-    (log/info "position update" (:entity/id entity) component)
+    ;;(log/info "position update" (:entity/id entity) component)
     (assoc component :movement/acceleration
                      (vector-add2 acceleration force))))
 
@@ -147,10 +147,10 @@
     ))
 
 
-(def current-world (atom (init-world)))
+#_(def current-world (atom (init-world)))
 
 
-(swap! current-world system/game-loop)
-(swap! current-world system/game-loop)
-(swap! current-world system/game-loop)
-(swap! current-world system/game-loop)
+#_(swap! current-world system/game-loop)
+#_(swap! current-world system/game-loop)
+#_(swap! current-world system/game-loop)
+#_(swap! current-world system/game-loop)
