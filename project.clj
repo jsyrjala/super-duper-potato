@@ -6,44 +6,21 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/tools.logging "0.4.1"]
                  [ch.qos.logback/logback-classic "1.2.3"]
-
-                 [play-cljc "0.3.0"]
-
+                 [de.gurkenlabs/litiengine "0.4.17"]
                  [nrepl "0.6.0"]
-
-                 [org.lwjgl/lwjgl "3.2.2"]
-                 [org.lwjgl/lwjgl "3.2.2"
-                  :classifier "natives-macos"
-                  ;;:native-prefix ""
-                  ]
-
-                 [org.lwjgl/lwjgl-glfw "3.2.2"]
-                 [org.lwjgl/lwjgl-glfw "3.2.2"
-                  :classifier "natives-macos"
-                  ;;:native-prefix ""
-                  ]
-
-                 [org.lwjgl/lwjgl-opengl "3.2.2"]
-                 [org.lwjgl/lwjgl-opengl "3.2.2"
-                  :classifier "natives-macos"
-                  ;;:native-prefix ""
-                  ]
-
-                 [org.lwjgl/lwjgl-stb "3.2.2"]
-                 [org.lwjgl/lwjgl-stb "3.2.2"
-                  :classifier "natives-macos"
-                  ;;:native-prefix ""
-                  ]
                  ]
   :profiles {:dev {:dependencies [
                                   [criterium "0.4.5"]
                                   ]
                    }
             }
+  ;; :injections [(.. System (setProperty "clojure.server.repl" ""{:port 5555 :accept clojure.core.server/repl}""))]
   :jvm-opts ["-XX:+PrintCommandLineFlags"
-             "-XstartOnFirstThread"
+             ;; "-XstartOnFirstThread"
+              "-Dclojure.server.repl={:port 5555 :accept clojure.core.server/repl}"
              ]
-  :repl-options {:init-ns  clojure-ces.example.input
-                 }
-  :main clojure-ces.example.input/start
+  ;; :repl-options {:init-ns  clojure-ces.example.input}
+  ;; :main clojure-ces.example.input/start
+  :main clojure-ces.example.litiengine
+
   )
