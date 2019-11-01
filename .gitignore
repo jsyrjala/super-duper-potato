@@ -11,3 +11,5 @@ pom.xml.asc
 /.nrepl-history
 .hgignore
 .hg/
+.idea
+*.iml
