@@ -1,7 +1,8 @@
 (ns clojure-ces.example.asteroid
   (:require [clojure-ces.system :as system]
             [clojure-ces.example.vector :as vector]
-            [clojure.tools.logging :as log])
+            [clojure.tools.logging :as log]
+            [clojure-ces.example.input :as input])
 
   )
 
@@ -104,6 +105,27 @@
     (system/contains-all-components? [:movement :position])))
 
 
+(defn keyboad-controller [world system entity]
+  (let [position-c (system/first-component entity :position)
+        keys @input/keys-down
+        left (keys 37)
+        right (keys 39)
+        direction (:position/direction position-c)
+        speed 0.1
+        new-direction (cond (and left right) direction
+                            left (- direction speed)
+                            right (+ direction speed)
+                            :else direction)]
+    (system/update-component entity :position
+                             #(assoc %
+                                :position/direction new-direction))))
+
+(def keyboard-system
+  (system/create-system
+    "Keyboard"
+    keyboad-controller
+    (system/contains-all-components? [:controlled :position])))
+
 (defn named [name]
   {:component/type :named
    :named/name     name})
@@ -128,10 +150,14 @@
    :score/score    score
    :score/lives    lives})
 
+(defn controlled []
+  {:component/type :controlled})
+
 ;; entities
 (def player (system/create-entity
               [(named "player")
-               (position (vector/vector2 30 30) 0)
+               (controlled)
+               (position (vector/vector2 40 30) 0)
                (movement (vector/vector2 0 0) (vector/vector2 0 0))
                (drawable :player)
                (score 0 3)]))
@@ -153,8 +179,9 @@
 
 (defn init-world []
   (let [world (system/create-world)
-        systems [drawable-system
-                 gravity-system
+        systems [keyboard-system
+                 drawable-system
+                 ;;gravity-system
                  moving-system]]
     (-> (reduce system/add-system world systems)
         (system/add-entities

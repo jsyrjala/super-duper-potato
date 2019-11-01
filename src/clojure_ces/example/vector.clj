@@ -45,3 +45,10 @@
         [x2 y2] v2]
     [(+ (number x1) (number x2))
      (+ (number y1) (number y2))]))
+
+(defn rotate [v rad]
+  (let [[x y] v
+        c (Math/cos rad)
+        s (Math/sin rad)]
+    [(- (* x c) (* y s))
+     (+ (* x s) (* y c))]))

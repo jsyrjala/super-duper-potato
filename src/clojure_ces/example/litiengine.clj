@@ -1,6 +1,7 @@
 (ns clojure-ces.example.litiengine
   (:require [clojure.tools.logging :as log]
-            [clojure.java.io :as jio])
+            [clojure.java.io :as jio]
+            [clojure-ces.example.input :as input])
   (:import (de.gurkenlabs.litiengine Game GameListener)
            (de.gurkenlabs.litiengine.gui.screens Screen Resolution)
            (java.awt Graphics2D Taskbar)
@@ -17,6 +18,7 @@
 (defn start-engine [args draw-fn]
   (log/info "start" args)
   (Game/init (into-array String args))
+  (input/register-key-handlers)
   (let [window (Game/window)
         icon (ImageIO/read (jio/resource "asteroid.png"))
         taskbar (Taskbar/getTaskbar)]
