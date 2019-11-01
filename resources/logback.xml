@@ -1,0 +1,17 @@
+<configuration scan="true">
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- encoders are  by default assigned the type
+             ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
+        <encoder>
+            <pattern>%-5level %logger{20} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- main application -->
+    <logger name="clojure-ces" level="info"/>
+
+    <root level="info">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>

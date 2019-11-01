@@ -1,8 +1,9 @@
 (ns clojure-ces.system)
 
 
-(def next-id (let [counter (atom 0)]
-               (fn [] (swap! counter inc))))
+(def next-id
+  (let [counter (atom 0)]
+    (fn [] (swap! counter inc))))
 
 (defn create-world
   "Create a new, empty world"
@@ -18,6 +19,9 @@
     world))
 
 (defn create-system
+  "Create a system
+  update-fn:
+  applies-fn:"
   [name update-fn applies-fn]
   {
    :system/id (next-id)
@@ -247,7 +251,9 @@
   (fn [component]
     (= (:component/type component) type)))
 
-(defn first-component [entity type]
+(defn first-component
+  "Return the first component of matching type"
+  [entity type]
   (->> (-> entity :entity/components)
        (filter (for-component-type type))
        first))
@@ -282,7 +288,7 @@
 
 ;;;; test/app code
 
-#_(do
+#_ (do
   (defn aging [age]
     {:component/type  :aging
      :aging/hitpoints age})

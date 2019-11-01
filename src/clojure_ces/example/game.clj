@@ -7,7 +7,7 @@
 
 (def graphics)
 (defn draw-fn [graphics]
-  (fn [world system entity]
+  (fn draw-fn-inner [world system entity]
     ;;(graphics/draw-actor graphics entity)
     nil)
   )
