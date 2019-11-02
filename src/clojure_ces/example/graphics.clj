@@ -40,7 +40,7 @@
   (let [position (system/first-component entity :position)
         [^double x ^double y] (:position/position position)
         direction (:position/direction position)
-        points [[-10.0 -10.0] [10.0 -10.0] [10.0 10.0] [-10.0 10.0]]
+        points [[-0.5 -0.5] [0.5 -0.5] [0.5 0.5] [-0.5 0.5]]
         points (map #(vector/rotate % direction) points)
         poly (Polygon.)]
     (doseq [[px py] points]

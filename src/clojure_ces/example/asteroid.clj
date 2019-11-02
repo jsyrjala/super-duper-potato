@@ -59,8 +59,9 @@
         velocity (:movement/velocity movement)
         angular-velocity (:movement/angular-velocity movement)
         acceleration (:movement/acceleration movement)
+        max-velocity (:movement/max-velocity movement)
         new-velocity (vector/clamp (vector/add velocity acceleration)
-                                   2.0)
+                                   max-velocity)
         new-position (vector/add position new-velocity)
         new-direction (+ direction angular-velocity)
         ]
@@ -144,18 +145,24 @@
 (defn shooting-update [world system entity]
   (let [shooter-c (system/first-component entity :shooter)
         shoots (:shooter/shoots shooter-c)
+        now (:world/loop-timestamp world)
+        last-shot (:shooter/last-shot shooter-c)
         position-c (system/first-component entity :position)
         movement-c (system/first-component entity :movement)
         position (:position/position position-c)
         direction (:position/direction position-c)
         velocity (:movement/velocity movement-c)
-        b-rel-velocity (vector/scale (vector/rotate [1 0] direction)
+        b-rel-velocity (vector/scale (vector/rotate [0 -1] direction)
                                      2)
         b-velocity (vector/add velocity
                                b-rel-velocity)]
-    (if shoots
-      (let [bullet (entities/create-bullet position b-velocity direction)]
-        (system/make-entity-update entity bullet nil))
+    (if (and shoots
+             (> (- now last-shot) 200))
+      (let [bullet (entities/create-bullet position b-velocity direction)
+            new-entity (system/update-component entity :shooter
+                                                #(assoc %
+                                                   :shooter/last-shot now))]
+        (system/make-entity-update new-entity bullet nil))
       entity)))
 
 (def shooting-system

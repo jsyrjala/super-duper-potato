@@ -14,12 +14,13 @@
 
 (defn movement
   ([velocity acceleration]
-   (movement velocity acceleration 0.0))
-  ([velocity acceleration angular-velocity]
+   (movement velocity acceleration 0.0 2.0))
+  ([velocity acceleration angular-velocity max-velocity]
    {:component/type            :movement
     :movement/velocity         velocity
     :movement/acceleration     acceleration
-    :movement/angular-velocity angular-velocity}))
+    :movement/angular-velocity angular-velocity
+    :movement/max-velocity     max-velocity}))
 
 (defn drawable [sprite]
   {:component/type  :drawable
@@ -52,7 +53,9 @@
 (def bullet (system/create-entity
               [(named "bullet")
                (position (vector/vector2 1 2) 0)
-               (movement (vector/vector2 0.1 0.1) (vector/vector2 0 0))
+               (movement (vector/vector2 0.1 0.1)
+                         (vector/vector2 0 0)
+                         0 4.0)
                (drawable :bullet)]))
 
 (defn create-player [pos]
@@ -86,7 +89,7 @@
   (system/create-entity
     [(named "asteroid")
      (position pos direction)
-     (movement velocity (vector/vector2 0 0) angular-velocity)
+     (movement velocity (vector/vector2 0 0) angular-velocity 2.0)
      (drawable :asteroid)
      ])
   )
@@ -95,7 +98,7 @@
   (system/create-entity
     [(named "bullet")
      (position pos direction)
-     (movement velocity (vector/vector2 0 0) 0)
+     (movement velocity (vector/vector2 0 0) 0 4.0)
      (drawable :bullet)
      ])
   )
