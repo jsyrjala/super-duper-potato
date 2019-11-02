@@ -24,7 +24,7 @@
         taskbar (Taskbar/getTaskbar)]
     (.setIconImage window icon)
     (.setIconImage taskbar icon)
-    (.setTitle window "Asteroids!")
+    (.setTitle window "super-duper-potato!")
     (.setResolution window (Resolution/custom 400 400 "4x3")))
 
   (log/info "init done")
