@@ -95,7 +95,7 @@
         up (keys 38)
         position (:position/position position-c)
         direction (:position/direction position-c)
-        speed 0.05
+        speed 0.06
         new-direction (cond (and left right) direction
                             left (- direction speed)
                             right (+ direction speed)
@@ -230,15 +230,22 @@
 (defn get-entity-name [entity]
   (:named/name (system/first-component entity :named)))
 
-(defn register-hit [entity damage]
+(defn register-hit [now entity damage]
   (let [health-c (system/first-component entity :health)
         hitpoints (:health/hit-points health-c)]
-    (system/update-component entity :health
-                             #(assoc %
-                                :health/hit-points (- hitpoints damage)))))
+    (-> entity
+        (system/update-component :health
+                                 #(assoc %
+                                    :health/hit-points (- hitpoints damage)))
+        (system/update-component :flasher
+                                 #(assoc %
+                                    :flasher/start now
+                                    :flasher/end (+ now 500)))
+        )))
 
 (defn collider-handler-update [world system entity]
-  (let [entities (system/system-managed-entities world :collider-system)
+  (let [now (:world/loop-timestamp world)
+        entities (system/system-managed-entities world :collider-system)
         groups (group-by get-entity-name entities)
         bullets (groups :bullet)
         asteroids (groups :asteroid)
@@ -258,7 +265,7 @@
       (let [bullets-to-remove (map :bullet collisions)
             asteroids-to-update (->> collisions
                                      (map :asteroid)
-                                     (map #(register-hit % 1)))]
+                                     (map #(register-hit now % 1)))]
         (system/make-entity-update entity asteroids-to-update bullets-to-remove))
       entity)))
 

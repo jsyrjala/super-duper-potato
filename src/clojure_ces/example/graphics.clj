@@ -26,22 +26,25 @@
         (.draw g (new Line2D$Double (+ tx x), (+ ty y), (+ x rx), (+ y ry))))
       )))
 
-(defn draw-big-asteroid [^Graphics2D g world entity]
-  (let [position (system/first-component entity :position)
-        [^double x ^double y] (:position/position position)
-        direction (:position/direction position)
-        points [[-15.0 -15.0] [15.0 -15.0] [15.0 15.0] [-15.0 15.0]]
-        points (map #(vector/rotate % direction) points)
-        poly (Polygon.)]
-    (doseq [[px py] points]
-      (.addPoint poly (+ x px) (+ y py)))
-    (.setColor g Color/RED)
-    (.draw g poly)
-    ))
+(defn color-flasher [now color-normal flasher]
+  (let [start (:flasher/start flasher)
+        end (:flasher/end flasher)]
+    (if (< end now)
+      color-normal
+      (let [p (- 1.0 (/ (- now start)
+                        (- end start)))
+            ip (- 1 p)
+            cp (* p 255)
+            r (int (+ cp (* ip (.getRed color-normal))))
+            g (int (+ cp (* ip (.getGreen color-normal))))
+            b (int (+ cp (* ip (.getBlue color-normal))))]
+        (Color. r g b)))))
 
 (defn draw-asteroid [^Graphics2D g world entity]
-  (let [position (system/first-component entity :position)
+  (let [now (:world/loop-timestamp world)
+        position (system/first-component entity :position)
         size-c (system/first-component entity :size)
+        flasher-c (system/first-component entity :flasher)
         radius (:size/radius size-c)
         [^double x ^double y] (:position/position position)
         direction (:position/direction position)
@@ -53,7 +56,7 @@
         poly (Polygon.)]
     (doseq [[px py] points]
       (.addPoint poly (+ x px) (+ y py)))
-    (.setColor g Color/RED)
+    (.setColor g (color-flasher now Color/RED flasher-c))
     (.draw g poly)
   ))
 

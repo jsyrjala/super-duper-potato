@@ -67,6 +67,11 @@
   {:component/type :size
    :size/radius     (or radius 10)})
 
+(defn flasher []
+  {:component/type :flasher
+   :flasher/start 0
+   :flasher/end 0})
+
 ;; entities
 
 (defn create-player [pos]
@@ -95,6 +100,7 @@
      (collider)
      (health (int (+ (/ radius 5) 3)))
      (wrap-around)
+     (flasher)
      ]))
 
 (defn create-bullet [now pos velocity direction]
