@@ -72,7 +72,17 @@
    :flasher/start 0
    :flasher/end 0})
 
-;; entities
+(defn text-display [text]
+  {:component/type :text-display
+  :text-display/text text})
+
+(defn create-text-display [pos text]
+  (system/create-entity
+    [(named :text-display)
+     (position pos 0)
+     (drawable :text)
+     (text-display text)
+     ]))
 
 (defn create-player [pos]
   (system/create-entity
@@ -89,7 +99,6 @@
      (score 0 3)]))
 
 
-;; :asteroid :big-asteroid
 (defn create-asteroid [pos velocity direction angular-velocity radius]
   (system/create-entity
     [(named :asteroid)

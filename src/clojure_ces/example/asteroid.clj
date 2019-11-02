@@ -230,7 +230,7 @@
 (defn get-entity-name [entity]
   (:named/name (system/first-component entity :named)))
 
-(defn register-hit [now entity damage]
+(defn register-hit [now damage entity]
   (let [health-c (system/first-component entity :health)
         hitpoints (:health/hit-points health-c)]
     (-> entity
@@ -243,7 +243,7 @@
                                     :flasher/end (+ now 500)))
         )))
 
-(defn collider-handler-update [world system entity]
+(defn collider-handler-update [world system player]
   (let [now (:world/loop-timestamp world)
         entities (system/system-managed-entities world :collider-system)
         groups (group-by get-entity-name entities)
@@ -260,14 +260,33 @@
                          (when (< (vector/distance b-pos a-pos) radius)
                            {:bullet bullet :asteroid asteroid}))
                 ))
+        player-collisions (for [asteroid asteroids]
+                            (let [size-c (system/first-component asteroid :size)
+                                  radius (:size/radius size-c)
+                                  a-pos-c (system/first-component asteroid :position)
+                                  a-pos (:position/position a-pos-c)
+                                  p-pos-c (system/first-component player :position)
+                                  p-pos (:position/position p-pos-c)]
+                              (when (< (vector/distance p-pos a-pos) (+ radius 5))
+                                {:player player :asteroid asteroid})
+                              ))
+        collisions (concat collisions player-collisions)
         collisions (filter identity (flatten collisions))]
     (if (seq collisions)
-      (let [bullets-to-remove (map :bullet collisions)
+      (let [bullets-to-remove (filter identity (map :bullet collisions))
             asteroids-to-update (->> collisions
                                      (map :asteroid)
-                                     (map #(register-hit now % 1)))]
-        (system/make-entity-update entity asteroids-to-update bullets-to-remove))
-      entity)))
+                                     (filter identity)
+                                     (map #(register-hit now 1 %)))
+            new-player (->> collisions
+                            (map :player)
+                            (filter identity)
+                            first
+                            (register-hit now 1)
+                            )
+            ]
+        (system/make-entity-update new-player asteroids-to-update bullets-to-remove))
+      player)))
 
 ;; TODO very ugly
 ;; attached to the player
@@ -310,7 +329,7 @@
   (let [pos-c (system/first-component asteroid :position)
         pos (:position/position pos-c)
         size-c (system/first-component asteroid :size)
-        radius (:size/radius size-c)]
+        radius (or (:size/radius size-c) 10)]
     (cond (< radius 11) []
           (< radius 16) (map (fn [_] (create-new-asteroid pos 10.0)) (range 4))
           (< radius 21) (map (fn [_] (create-new-asteroid pos 15.0)) (range 3))

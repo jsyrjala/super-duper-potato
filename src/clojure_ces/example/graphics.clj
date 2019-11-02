@@ -2,13 +2,24 @@
   (:require [clojure-ces.system :as system]
             [clojure.tools.logging :as log]
             [clojure-ces.example.vector :as vector])
-  (:import (java.awt Graphics2D Color Toolkit BasicStroke Polygon)
+  (:import (java.awt Graphics2D Color Toolkit BasicStroke Polygon Font)
            (java.awt.geom Line2D$Double Rectangle2D$Double)))
 
 
 (defn draw-screen [^Graphics2D g world]
 
   )
+
+(defn draw-text [^Graphics2D g world entity]
+  (let [position (system/first-component entity :position)
+        [^double x ^double y] (:position/position position)
+        text-display (system/first-component entity :text-display)
+        ^String text (:text-display/text text-display)
+        current-font (.getFont g)
+        new-font (.deriveFont current-font 30)]
+    (.setFont g new-font)
+    (.setColor g Color/WHITE)
+    (.drawString g text x y)))
 
 (defn draw-player [^Graphics2D g world entity]
   (let [position (system/first-component entity :position)
@@ -101,6 +112,7 @@
               :asteroid draw-asteroid
               :bullet draw-bullet
               :particle draw-particle
+              :text draw-text
               :default draw-entity})
 
 
