@@ -145,7 +145,7 @@
   (system/create-system
     :wrap-around-system
     #(wrap-around-update %1 %2 %3)
-    (system/contains-all-components? [:position])
+    (system/contains-all-components? [:position :wrap-around])
     {:wrap-around/bounding-box [50.0 50.0 300.0 300.0]}))
 
 (defn shooting-update [world system entity]
@@ -226,6 +226,87 @@
     (system/contains-all-components? [:controlled :position])
     ))
 
+
+(defn get-entity-name [entity]
+  (:named/name (system/first-component entity :named)))
+
+(defn register-hit [entity damage]
+  (let [health-c (system/first-component entity :health)
+        hitpoints (:health/hit-points health-c)]
+    (system/update-component entity :health
+                             #(assoc %
+                                :health/hit-points (- hitpoints damage)))))
+
+(defn collider-handler-update [world system entity]
+  (let [entities (system/system-managed-entities world :collider-system)
+        groups (group-by get-entity-name entities)
+        bullets (groups :bullet)
+        asteroids (groups :asteroid)
+        collisions (for [bullet bullets]
+                     (for [asteroid asteroids]
+                       (let [b-pos-c (system/first-component bullet :position)
+                             b-pos (:position/position b-pos-c)
+                             a-pos-c (system/first-component asteroid :position)
+                             a-pos (:position/position a-pos-c)]
+                         (when (< (vector/distance b-pos a-pos) 10)
+                           {:bullet bullet :asteroid asteroid}))
+                ))
+        collisions (filter identity (flatten collisions))]
+    (if (seq collisions)
+      (let [bullets-to-remove (map :bullet collisions)
+            asteroids-to-update (->> collisions
+                                     (map :asteroid)
+                                     (map #(register-hit % 1)))]
+        (system/make-entity-update entity asteroids-to-update bullets-to-remove))
+      entity)))
+
+;; TODO very ugly
+;; attached to the player
+(def collider-handler-system
+  (system/create-system
+    :collider-handler-system
+    #(collider-handler-update %1 %2 %3)
+    (system/contains-all-components? [:collider-handler])
+    ))
+
+
+;; this is no-op and used as marker to mark things
+;; that can collide
+(def collider-system
+  (system/create-system
+    :collider-system
+    (fn [_ _ entity] entity)
+    (system/contains-all-components? [:collider])
+    ))
+
+
+(defn create-random-particle [now pos]
+  (let [direction (rand 20.0)
+        velocity (vector/scale
+                   (vector/rotate [1 0] direction)
+                   (rand 3.0))
+        age (rand-int 1000)]
+    (entities/create-particle now pos velocity direction age)
+    ))
+
+(defn health-update [world system entity]
+  (let [now (:world/loop-timestamp world)
+        health-c (system/first-component entity :health)
+        pos-c (system/first-component entity :position)
+        pos (:position/position pos-c)
+        hitpoints (:health/hit-points health-c)]
+    (if (< hitpoints 1)
+      (let [particles (map (fn [_] (create-random-particle now pos))
+                           (range 30))]
+        (system/make-entity-update nil particles entity))
+      entity)))
+
+(def health-system
+  (system/create-system
+    :health-system
+    #(health-update %1 %2 %3)
+    (system/contains-all-components? [:health])))
+
 (defn rand-pos []
   [(+ 20 (rand-int 350)) (+ 20 (rand-int 350))])
 
@@ -246,8 +327,11 @@
                  shooting-system
                  drawable-system
                  moving-system
+                 collider-system
+                 collider-handler-system
                  wrap-around-system
                  aging-system
+                 health-system
                  ]]
     (-> (reduce system/add-system world systems)
         (system/add-entities

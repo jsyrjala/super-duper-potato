@@ -6,6 +6,10 @@
            (java.awt.geom Line2D$Double Rectangle2D$Double)))
 
 
+(defn draw-screen [^Graphics2D g world]
+
+  )
+
 (defn draw-player [^Graphics2D g world entity]
   (let [position (system/first-component entity :position)
         [^double x ^double y] (:position/position position)]
@@ -80,12 +84,12 @@
 
 
 (defn draw-things [^Graphics2D g world]
-  (swap! world system/game-loop)
 
   (let [current-world @world
         entities (system/system-managed-entities current-world :drawable-system)]
     ;; TODO this is totally in wrong place?
 
+    (draw-screen g current-world)
     (doseq [entity entities]
       (let [drawable (system/first-component entity :drawable)
             sprite (:drawable/sprite drawable)
@@ -95,5 +99,6 @@
 
     ;; https://stackoverflow.com/questions/18684220/why-is-java-application-running-smoother-when-moving-mouse-over-it-video-includ
     (.sync (Toolkit/getDefaultToolkit))
+    (swap! world system/game-loop)
     ))
 

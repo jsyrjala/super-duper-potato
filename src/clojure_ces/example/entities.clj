@@ -48,8 +48,20 @@
    :aging/death-time (+ now max-age)
    :aging/birth-time now})
 
+;; This is attached to single entity (player)
+(defn collider-handler []
+  {:component/type :collider-handler})
+
+;; these are attached to anyting that can collide
 (defn collider []
   {:component/type :collider})
+
+(defn health [max-hit-points]
+  {:component/type :health
+   :health/hit-points max-hit-points})
+
+(defn wrap-around []
+  {:component/type :wrap-around})
 
 ;; entities
 
@@ -61,7 +73,10 @@
      (movement (vector/vector2 0 0) (vector/vector2 0 0))
      (drawable :player)
      (shooter)
+     (collider-handler)
      (collider)
+     (health 1)
+     (wrap-around)
      (score 0 3)]))
 
 (defn create-asteroid [pos velocity direction angular-velocity]
@@ -71,6 +86,8 @@
      (movement velocity (vector/vector2 0 0) angular-velocity 2.0)
      (drawable :asteroid)
      (collider)
+     (health 5)
+     (wrap-around)
      ]))
 
 (defn create-bullet [now pos velocity direction]
@@ -81,6 +98,7 @@
      (drawable :bullet)
      (aging now 2500)
      (collider)
+     (wrap-around)
      ]))
 
 (defn create-particle [now pos velocity direction max-age]
