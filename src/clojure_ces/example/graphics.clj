@@ -35,6 +35,20 @@
     (.draw g poly)
   ))
 
+
+(defn draw-bullet [^Graphics2D g entity]
+  (let [position (system/first-component entity :position)
+        [^double x ^double y] (:position/position position)
+        direction (:position/direction position)
+        points [[-10.0 -10.0] [10.0 -10.0] [10.0 10.0] [-10.0 10.0]]
+        points (map #(vector/rotate % direction) points)
+        poly (Polygon.)]
+    (doseq [[px py] points]
+      (.addPoint poly (+ x px) (+ y py)))
+    (.setColor g Color/CYAN)
+    (.draw g poly)
+    ))
+
 (defn draw-entity [^Graphics2D g entity]
  (let [position (system/first-component entity :position)
        [^double x ^double y] (:position/position position)]
@@ -44,6 +58,7 @@
 
 (def sprites {:player draw-player
               :asteroid draw-asteroid
+              :bullet draw-bullet
               :default draw-entity})
 
 

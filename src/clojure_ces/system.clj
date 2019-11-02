@@ -14,6 +14,7 @@
         world {:world/id         true
                :world/loop-count loop-count
                :world/loop-times (list [loop-count now])
+               :world/loop-timestamp now
                :world/entities   {}
                :world/systems    []
                :world/lookups    {} }]
@@ -211,11 +212,11 @@
         loop-times (->> world :world/loop-times
                         (take 9)
                         (cons [loop-count now]))]
-    ;; (println "LOOP:"  loop-count  "@"  now)
     (-> world
         (update-in [:world/loop-count] (constantly loop-count))
-        (update-in [:world/loop-times] (constantly loop-times)
-                   ))))
+        (update-in [:world/loop-times] (constantly loop-times))
+        (update-in [:world/loop-timestamp] (constantly now))
+        )))
 
 (defn game-loop [world]
   (let [new-world (start-loop world)

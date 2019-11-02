@@ -55,6 +55,33 @@
                (movement (vector/vector2 0.1 0.1) (vector/vector2 0 0))
                (drawable :bullet)]))
 
+(defn create-player [pos]
+  (system/create-entity
+    [(named "player")
+     (controlled)
+     (position pos 0)
+     (movement (vector/vector2 0 0) (vector/vector2 0 0))
+     (drawable :player)
+     (shooter)
+     (score 0 3)]))
+
+;; entities
+(def player (system/create-entity
+              [(named "player")
+               (controlled)
+               (position (vector/vector2 40 30) 0)
+               (movement (vector/vector2 0 0) (vector/vector2 0 0))
+               (drawable :player)
+               (shooter)
+               (score 0 3)]))
+
+
+(def bullet (system/create-entity
+              [(named "bullet")
+               (position (vector/vector2 1 2) 0)
+               (movement (vector/vector2 0.1 0.1) (vector/vector2 0 0))
+               (drawable :bullet)]))
+
 (defn create-asteroid [pos velocity direction angular-velocity]
   (system/create-entity
     [(named "asteroid")

@@ -111,12 +111,12 @@
                        (system/update-component :movement
                                                 #(assoc %
                                                    :movement/acceleration new-accel))
-
+                       (system/update-component :shooter
+                                                #(assoc %
+                                                   :shooter/shoots (boolean space)))
                        )
-        bullet (when space
-                 (entities/create-bullet position [0 0] direction))
         ]
-      (system/make-entity-update new-entity bullet nil)
+    new-entity
     ))
 
 (def keyboard-system
@@ -141,6 +141,30 @@
     (system/contains-all-components? [:position])
     {:wrap-around/bounding-box [50.0 50.0 300.0 300.0]}))
 
+(defn shooting-update [world system entity]
+  (let [shooter-c (system/first-component entity :shooter)
+        shoots (:shooter/shoots shooter-c)
+        position-c (system/first-component entity :position)
+        movement-c (system/first-component entity :movement)
+        position (:position/position position-c)
+        direction (:position/direction position-c)
+        velocity (:movement/velocity movement-c)
+        b-rel-velocity (vector/scale (vector/rotate [1 0] direction)
+                                     2)
+        b-velocity (vector/add velocity
+                               b-rel-velocity)]
+    (if shoots
+      (let [bullet (entities/create-bullet position b-velocity direction)]
+        (system/make-entity-update entity bullet nil))
+      entity)))
+
+(def shooting-system
+  (system/create-system
+    :shooting-system
+    #(shooting-update %1 %2 %3)
+    (system/contains-all-components? [:shooter])
+    ))
+
 (defn named [name]
   {:component/type :named
    :named/name     name})
@@ -159,40 +183,12 @@
     :movement/acceleration     acceleration
     :movement/angular-velocity angular-velocity}))
 
-(defn drawable [sprite]
-  {:component/type  :drawable
-   :drawable/sprite sprite})
+(def player (entities/create-player (vector/vector2 40 30)))
 
-
-(defn score [score lives]
-  {:component/type :score
-   :score/score    score
-   :score/lives    lives})
-
-(defn controlled []
-  {:component/type :controlled})
-
-(defn shooter []
-  {:component/type    :shooter
-   :shooter/last-shot 0})
-
-;; entities
-(def player (system/create-entity
-              [(named "player")
-               (controlled)
-               (position (vector/vector2 40 30) 0)
-               (movement (vector/vector2 0 0) (vector/vector2 0 0))
-               (drawable :player)
-               (shooter)
-               (score 0 3)]))
-
-
-(def bullet (system/create-entity
-              [(named "bullet")
-               (position (vector/vector2 1 2) 0)
-               (movement (vector/vector2 0.1 0.1) (vector/vector2 0 0))
-               (drawable :bullet)]))
-
+;; TODO
+(def bullet (entities/create-bullet (vector/vector2 1 2)
+                                    (vector/vector2 0.1 0.1)
+                                    0))
 
 (defn rand-pos []
   [(+ 20 (rand-int 350)) (+ 20 (rand-int 350))])
@@ -212,6 +208,7 @@
   (let [world (system/create-world)
         systems [gravity-system
                  keyboard-system
+                 shooting-system
                  drawable-system
                  moving-system
                  wrap-around-system
