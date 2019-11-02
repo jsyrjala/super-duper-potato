@@ -4,8 +4,7 @@
             [clojure-ces.example.litiengine :as litiengine]
             [clojure-ces.example.graphics :as graphics]
             [clojure-ces.example.asteroid :as asteroid])
-  (:import (java.awt Graphics2D Color)
-           (de.gurkenlabs.litiengine.graphics RenderEngine))
+  (:import (java.awt Graphics2D))
   (:gen-class))
 
 (defonce world (atom (asteroid/init-world)))

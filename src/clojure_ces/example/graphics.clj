@@ -2,11 +2,10 @@
   (:require [clojure-ces.system :as system]
             [clojure.tools.logging :as log]
             [clojure-ces.example.vector :as vector])
-  (:import (java.awt Graphics2D Color Toolkit BasicStroke)
+  (:import (java.awt Graphics2D Color Toolkit BasicStroke Polygon)
            (de.gurkenlabs.litiengine.graphics RenderEngine)
            (java.awt.geom Line2D$Double Rectangle2D$Double)))
 
-(def text (atom "foo2"))
 
 (defn draw-player [^Graphics2D g entity]
   (let [position (system/first-component entity :position)
@@ -24,6 +23,22 @@
         (.draw g (new Line2D$Double (+ tx x), (+ ty y), (+ x rx), (+ y ry))))
       )))
 
+(defn draw-asteroid [^Graphics2D g entity]
+  (let [
+        position (system/first-component entity :position)
+        [^double x ^double y] (:position/position position)
+        direction (:position/direction position)
+        points [[-10.0 -10.0] [10.0 -10.0] [10.0 10.0] [-10.0 10.0]]
+        points (map #(vector/rotate % direction) points)
+        poly (Polygon.)
+        ]
+    (doseq [[px py] points]
+      (.addPoint poly (+ x px) (+ y py)))
+
+    (.setColor g Color/RED)
+    (.draw g poly)
+  ))
+
 (defn draw-entity [^Graphics2D g entity]
  (let [position (system/first-component entity :position)
        [^double x ^double y] (:position/position position)]
@@ -34,6 +49,7 @@
      )))
 
 (def sprites {:player draw-player
+              :asteroid draw-asteroid
               :default draw-entity})
 
 

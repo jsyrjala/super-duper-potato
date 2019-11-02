@@ -2,7 +2,7 @@
 
 
 (defn vector2 [x y]
-  [x y])
+  [(double x) (double y)])
 
 (defn number [value]
   (or value 0))

@@ -73,17 +73,21 @@
   (let [position-c (system/first-component entity :position)
         movement (system/first-component entity :movement)
         position (:position/position position-c)
+        direction (:position/direction position-c)
         velocity (:movement/velocity movement)
+        angular-velocity (:movement/angular-velocity movement)
         acceleration (:movement/acceleration movement)
         new-velocity (vector/clamp (vector/add velocity acceleration)
                                    2.0)
         new-position (vector/add position new-velocity)
+        new-direction (+ direction angular-velocity)
         ]
     (-> entity
         (system/update-component :position
                                  (fn newton-pos-up [component]
                                    (assoc component
-                                     :position/position new-position)))
+                                     :position/position new-position
+                                     :position/direction new-direction)))
         (system/update-component :movement
                                  (fn newton-vel-up [component]
                                    (assoc component
@@ -142,10 +146,14 @@
    :position/position  pos
    :position/direction direction})
 
-(defn movement [velocity acceleration]
-  {:component/type        :movement
-   :movement/velocity     velocity
-   :movement/acceleration acceleration})
+(defn movement
+  ([velocity acceleration]
+   (movement velocity acceleration 0.0))
+  ([velocity acceleration angular-velocity]
+   {:component/type            :movement
+    :movement/velocity         velocity
+    :movement/acceleration     acceleration
+    :movement/angular-velocity angular-velocity}))
 
 (defn drawable [sprite]
   {:component/type  :drawable
@@ -180,7 +188,7 @@
 (def asteroid (system/create-entity
                 [(named "asteroid")
                  (position (vector/vector2 1 1) 0)
-                 (movement (vector/vector2 0 0) (vector/vector2 0 0))
+                 (movement (vector/vector2 0.1 0.5) (vector/vector2 0 0) 0.05)
                  (drawable :asteroid)
                  ]))
 
