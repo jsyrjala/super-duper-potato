@@ -11,6 +11,9 @@ Code is mostly REPL friendly, so you can have affect game directly by
 evaluating functions. If that fails, then `clojure-ces.example.game/reset-world` 
 should start using the code changes.
 
+
+![Screenshot of the agame](./doc/screenshot.png "Screenshot")
+
 ## Usage
 
 Starts up Socket REPL in port localhost:

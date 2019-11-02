@@ -206,7 +206,7 @@
             position (:position/position position-c)
             position (vector/add position (vector/rotate [0 8] direction))
             velocity (:movement/velocity movement-c)
-            particle-dir (+ direction (rand 0.3) -0.1)
+            particle-dir (+ direction (rand 0.3) -0.15)
             b-rel-velocity (vector/scale
                              (vector/rotate [0 1]
                                             particle-dir)
@@ -363,12 +363,3 @@
         (system/add-entities
           entities))
     ))
-
-
-#_(def current-world (atom (init-world)))
-
-
-#_(swap! current-world system/game-loop)
-#_(swap! current-world system/game-loop)
-#_(swap! current-world system/game-loop)
-#_(swap! current-world system/game-loop)
