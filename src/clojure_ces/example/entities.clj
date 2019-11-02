@@ -27,10 +27,10 @@
    :drawable/sprite sprite})
 
 
-(defn score [score lives]
-  {:component/type :score
-   :score/score    score
-   :score/lives    lives})
+(defn score [score top-score]
+  {:component/type      :score
+   :score/current-score score
+   :score/top-score     top-score})
 
 (defn controlled []
   {:component/type :controlled
@@ -74,15 +74,21 @@
 
 (defn text-display [text]
   {:component/type :text-display
-  :text-display/text text})
+   :text-display/text text})
 
-(defn create-text-display [pos text]
+(defn game-stopper []
+  {:component/type :game-stopper})
+
+(defn asteroid-spawner []
+  {:component/type :asteroid-spawner})
+
+(defn create-text-display [now pos text]
   (system/create-entity
     [(named :text-display)
      (position pos 0)
      (drawable :text)
      (text-display text)
-     ]))
+     (aging now 5000)]))
 
 (defn create-player [pos]
   (system/create-entity
@@ -93,11 +99,18 @@
      (drawable :player)
      (shooter)
      (collider-handler)
-     (collider)
+     ;;(collider)
      (health 1)
      (wrap-around)
-     (score 0 3)]))
+     (game-stopper)
+     (score 0 0)
+     ]))
 
+(defn create-score-holder []
+  (system/create-entity
+    [(named :score-holder)
+     (drawable :score)
+     (score 0 0)]))
 
 (defn create-asteroid [pos velocity direction angular-velocity radius]
   (system/create-entity
@@ -108,6 +121,7 @@
      (drawable :asteroid)
      (collider)
      (health (int (+ (/ radius 5) 3)))
+     (asteroid-spawner)
      (wrap-around)
      (flasher)
      ]))

@@ -14,16 +14,16 @@
   (let [position (system/first-component entity :position)
         [^double x ^double y] (:position/position position)
         text-display (system/first-component entity :text-display)
-        ^String text (:text-display/text text-display)
-        current-font (.getFont g)
-        new-font (.deriveFont current-font 30)]
-    (.setFont g new-font)
+        ^String text (:text-display/text text-display)]
     (.setColor g Color/WHITE)
-    (.drawString g text x y)))
+    (.drawString g text x y)
+    ))
 
 (defn draw-player [^Graphics2D g world entity]
   (let [position (system/first-component entity :position)
-        [^double x ^double y] (:position/position position)]
+        [^double x ^double y] (:position/position position)
+        score (-> (system/first-component entity :score)
+                  :score/current-score)]
     (when position
       (.setColor g Color/YELLOW)
       (let [direction (:position/direction position)
@@ -35,6 +35,7 @@
             [rx ry] (vector/rotate right direction)]
         (.draw g (new Line2D$Double (+ tx x), (+ ty y), (+ x lx) (+ y ly)))
         (.draw g (new Line2D$Double (+ tx x), (+ ty y), (+ x rx), (+ y ry))))
+      (.drawString g (str "Score: " score) 350 10)
       )))
 
 (defn color-flasher [now color-normal flasher]
@@ -115,12 +116,17 @@
               :text draw-text
               :default draw-entity})
 
+(def first-time (atom true))
 
 (defn draw-things [^Graphics2D g world]
 
   (let [current-world @world
         entities (system/system-managed-entities current-world :drawable-system)]
-    ;; TODO this is totally in wrong place?
+
+    (when @first-time
+      ;; first text render takes couple of seconds because app is loading fonts
+      (.drawString g " " -10 -10)
+      (swap! first-time (constantly false)))
 
     (draw-screen g current-world)
     (doseq [entity entities]
@@ -131,7 +137,9 @@
           (draw-fn g current-world entity))))
 
     ;; https://stackoverflow.com/questions/18684220/why-is-java-application-running-smoother-when-moving-mouse-over-it-video-includ
-    (.sync (Toolkit/getDefaultToolkit))
+    ;;(.sync (Toolkit/getDefaultToolkit))
+    ;; TODO this is totally in wrong place?
+    ;; TOOD separate thread?
     (swap! world system/game-loop)
     ))
 

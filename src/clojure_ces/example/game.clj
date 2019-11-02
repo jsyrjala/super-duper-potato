@@ -9,7 +9,10 @@
 (def screen-w 600)
 (def wrap-border 40)
 
+(declare reset-world)
+
 (def config {:screen-size  [screen-w screen-w]
+             :reset-world  reset-world
              :bounding-box [(- wrap-border) (- wrap-border)
                             (+ screen-w wrap-border)
                             (+ screen-w wrap-border)]})

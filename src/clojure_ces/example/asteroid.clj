@@ -93,6 +93,7 @@
         left (keys 37)
         right (keys 39)
         up (keys 38)
+        r-key (keys 52)
         position (:position/position position-c)
         direction (:position/direction position-c)
         speed 0.06
@@ -278,12 +279,26 @@
                                      (map :asteroid)
                                      (filter identity)
                                      (map #(register-hit now 1 %)))
-            new-player (->> collisions
+
+            player-hit (->> collisions
                             (map :player)
                             (filter identity)
                             first
-                            (register-hit now 1)
+
                             )
+            new-player (if player-hit
+                         (register-hit now 1 player)
+                         player)
+
+            score-c (system/first-component player :score)
+            score (-> score-c :score/current-score)
+            top-score (-> score-c :score/top-score)
+
+            hits (count bullets-to-remove)
+            new-player (system/update-component new-player :score
+                                                #(assoc %
+                                                   :score/current-score (+ score hits)
+                                                   :score/top-score (max (+ score hits) top-score)))
             ]
         (system/make-entity-update new-player asteroids-to-update bullets-to-remove))
       player)))
@@ -330,7 +345,7 @@
         pos (:position/position pos-c)
         size-c (system/first-component asteroid :size)
         radius (or (:size/radius size-c) 10)]
-    (cond (< radius 11) []
+    (cond (< radius 11) [(create-new-asteroid [-15 -15] 20.0)]
           (< radius 16) (map (fn [_] (create-new-asteroid pos 10.0)) (range 4))
           (< radius 21) (map (fn [_] (create-new-asteroid pos 15.0)) (range 3))
           (< radius 31) (map (fn [_] (create-new-asteroid pos 20.0)) (range 2))
@@ -341,13 +356,17 @@
   (let [now (:world/loop-timestamp world)
         health-c (system/first-component entity :health)
         pos-c (system/first-component entity :position)
+        asteroid-spawner (system/first-component entity :asteroid-spawner)
+        game-stopper (system/first-component entity :game-stopper)
         pos (:position/position pos-c)
-        hitpoints (:health/hit-points health-c)]
+        hitpoints (:health/hit-points health-c)
+        ]
     (if (< hitpoints 1)
       (let [particles (map (fn [_] (create-random-particle now pos))
                            (range 30))
-            asteroids (create-child-asteroids entity)
-            new-entities (concat particles asteroids)]
+            asteroids (when asteroid-spawner (create-child-asteroids entity))
+            text (when game-stopper [(entities/create-text-display now [20 20] "You died! You suck! Press R to retry.")])
+            new-entities (concat particles asteroids text)]
         (system/make-entity-update nil new-entities entity))
       entity)))
 
@@ -384,6 +403,7 @@
      (entities/create-asteroid (rand-pos screen-size) (rand-velocity fast) 1 0.03 10.0)
 
      (entities/create-player (vector/scale screen-size 0.5))
+     (entities/create-score-holder)
      ]))
 
 (defn init-world [config]
