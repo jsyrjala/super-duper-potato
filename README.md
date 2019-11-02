@@ -1,24 +1,32 @@
-# clojure-ces
+# super-duper-potato
 
-A Clojure library designed to ... well, that part is up to you.
+Functional component entity system based "game engine". 
+Implemented mostly working Asteroids -like game with it.
+
+Full state of the game engine is in a single data structure.
+Set of funtions to manage entities and systems mostly ensures that
+there is a fast access to only to entities that a system needs to process.  
+
+Code is mostly REPL friendly, so you can have affect game directly by 
+evaluating functions. If that fails, then `clojure-ces.example.game/reset-world` 
+should start using the code changes.
 
 ## Usage
 
-FIXME
+Starts up Socket REPL in port localhost:
 
-<div>Icons made by <a href="https://www.flaticon.com/authors/freepik" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/"             title="Flaticon">www.flaticon.com</a></div>
+```
+lein run
+```
+
+With uberjar:
+```
+lein uberjar
+java -jar target/clojure-ces-0.1.0-SNAPSHOT-standalone.jar
+```
 
 ## License
 
-Copyright © 2019 FIXME
+Copyright © 2019 Juha Syrjälä
 
-This program and the accompanying materials are made available under the
-terms of the Eclipse Public License 2.0 which is available at
-http://www.eclipse.org/legal/epl-2.0.
-
-This Source Code may also be made available under the following Secondary
-Licenses when the conditions for such availability set forth in the Eclipse
-Public License, v. 2.0 are satisfied: GNU General Public License as published by
-the Free Software Foundation, either version 2 of the License, or (at your
-option) any later version, with the GNU Classpath Exception which is available
-at https://www.gnu.org/software/classpath/license.html.
+<div>Icons made by <a href="https://www.flaticon.com/authors/freepik" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/"             title="Flaticon">www.flaticon.com</a></div>
