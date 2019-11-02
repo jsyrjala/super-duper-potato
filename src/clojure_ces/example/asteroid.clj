@@ -334,14 +334,28 @@
 (defn rand-pos [[max-x max-y]]
   [(rand-int max-x) (rand-int max-y)])
 
+(defn rand-velocity [max-speed]
+  (let [dir (rand 20.0)
+        velocity (vector/rotate [0 1] dir)
+        velocity (vector/scale velocity (rand max-speed))]
+    velocity))
+
 (defn init-entities [config]
-  (let [screen-size (:screen-size config)]
-    [(entities/create-asteroid (rand-pos screen-size) [0.05 0.05] 7 -0.005 20.0)
-     (entities/create-asteroid (rand-pos screen-size) [0.1 0.1] 7 -0.005 20.0)
-     (entities/create-asteroid (rand-pos screen-size) [0.1 0.1] 7 0.01 15.0)
-     (entities/create-asteroid (rand-pos screen-size) [-0.1 0.01] 4 0.03 10.0)
-     (entities/create-asteroid (rand-pos screen-size) [-0.15 -0.11] 0 -0.03 10.0)
-     (entities/create-asteroid (rand-pos screen-size) [0.15 -0.11] 1 0.03 10.0)
+  (let [screen-size (:screen-size config)
+        slow 0.5
+        medium 1.0
+        fast 1.5]
+    [(entities/create-asteroid (rand-pos screen-size) (rand-velocity slow) 7 -0.005 20.0)
+     (entities/create-asteroid (rand-pos screen-size) (rand-velocity slow) 7 -0.005 20.0)
+
+     (entities/create-asteroid (rand-pos screen-size) (rand-velocity medium) 7 0.01 15.0)
+     (entities/create-asteroid (rand-pos screen-size) (rand-velocity medium) 4 0.03 15.0)
+
+     (entities/create-asteroid (rand-pos screen-size) (rand-velocity fast) 0 -0.03 10.0)
+     (entities/create-asteroid (rand-pos screen-size) (rand-velocity fast) 1 0.03 10.0)
+     (entities/create-asteroid (rand-pos screen-size) (rand-velocity fast) 1 0.03 10.0)
+     (entities/create-asteroid (rand-pos screen-size) (rand-velocity fast) 1 0.03 10.0)
+     (entities/create-asteroid (rand-pos screen-size) (rand-velocity fast) 1 0.03 10.0)
 
      (entities/create-player (vector/scale screen-size 0.5))
      ]))
