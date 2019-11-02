@@ -3,27 +3,7 @@
             [clojure-ces.example.vector :as vector]
             [clojure.tools.logging :as log]
             [clojure-ces.example.input :as input])
-
   )
-
-;; vectors stuff
-
-(def graphics)
-
-;;;;
-(defn draw-fn [graphics]
-  (fn draw-fn-inner [world system entity]
-    ;;(log/info "draw-fn" (:system/name system) (:entity/id entity))
-    nil))
-
-
-(defn position-update [world system entity component]
-  (let [position (:position/position component)
-        movement (system/first-component entity :movement)
-        velocity (:movement/velocity movement)]
-    ;(log/info "position update" (:entity/id entity) position velocity)
-    (assoc component :position/position
-                     (vector/add position velocity))))
 
 (defn zero-gravity-update [world system entity component]
   (assoc component :movement/acceleration [0.0 0.0]))
@@ -56,13 +36,13 @@
 
 (def drawable-system
   (system/create-system
-    "Drawable"
-    (draw-fn graphics)
+    :drawable-system
+    nil
     (system/contains-all-components? [:drawable :position])))
 
 (def gravity-system
   (system/create-system
-    "Gravity"
+    :gravity-system
     (system/update-component-with :movement #(gravity-update %1 %2 %3 %4))
     (system/contains-all-components? [:movement :position])
     {:gravity/constant-force [0 0.1]
@@ -97,7 +77,7 @@
 
 (def moving-system
   (system/create-system
-    "Movable"
+    :moving-system
     #(newton-update %1 %2 %3)
     (system/contains-all-components? [:movement :position])))
 
@@ -135,7 +115,7 @@
 
 (def keyboard-system
   (system/create-system
-    "Keyboard"
+    :keyboard-system
     #(keyboad-controller %1 %2 %3)
     (system/contains-all-components? [:controlled :position])))
 
@@ -150,7 +130,7 @@
 
 (def wrap-around-system
   (system/create-system
-    "WrapAround"
+    :wrap-around-system
     #(wrap-around-update %1 %2 %3)
     (system/contains-all-components? [:position])
     {:wrap-around/bounding-box [50.0 50.0 300.0 300.0]}))
@@ -201,14 +181,6 @@
                (position (vector/vector2 1 2) 0)
                (movement (vector/vector2 0.1 0.1) (vector/vector2 0 0))
                (drawable :bullet)]))
-
-
-(def asteroid (system/create-entity
-                [(named "asteroid")
-                 (position (vector/vector2 1 1) 0)
-                 (movement (vector/vector2 0.1 0.5) (vector/vector2 0 0) 0.05)
-                 (drawable :asteroid)
-                 ]))
 
 (defn create-asteroid [pos velocity direction angular-velocity]
   (system/create-entity

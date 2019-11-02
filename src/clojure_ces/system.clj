@@ -30,7 +30,9 @@
    (merge
      {:system/id         (next-id)
       :system/name       name
-      :system/update-fn  update-fn
+      :system/update-fn  (or update-fn
+                             (fn [world system entity]
+                               entity))
       :system/applies-fn applies-fn}
      data)))
 
@@ -294,105 +296,15 @@
           (make-entity-update entity)))
       )))
 
-
-;;;; test/app code
-
-#_ (do
-  (defn aging [age]
-    {:component/type  :aging
-     :aging/hitpoints age})
-
-  (defn position
-    [x y]
-    {:component/type    :position
-     :position/location {:x x :y y}})
-
-  (defn score [score]
-    {:component/type :score
-     :score/score    score})
-
-  (defn cloning [timeout]
-    {:component/type      :cloning
-     :cloning/timeout     timeout
-     :cloning/max-timeout timeout})
-
-  ;; example of simple single component updater
-  (defn position-update [world system entity component]
-    (let [pos (:position/location component)
-          [x y] [(:x pos) (:y pos)]
-          new-component (assoc component :position/location {:x (inc x) :y (inc y)})]
-      new-component))
-
-  (def update-position (update-component-with :position position-update))
-
-  ;; example of updater that can remove the current entity
-  (defn update-aging [world system entity]
-    (let [aging (->> entity :entity/components
-                     (filter (for-component-type :aging))
-                     first)
-          hitpoints (-> aging :aging/hitpoints)]
-      (if (<= hitpoints 1)
-        (make-entity-update nil nil [entity])
-        (update-component entity :aging #(update-in % [:aging/hitpoints] dec))
-        )))
-
-  (defn update-cloning [world system entity]
-    (let [component (->> entity :entity/components
-                         (filter (for-component-type :cloning))
-                         first)
-          max-timeout (-> component :cloning/max-timeout)
-          timeout (-> component :cloning/timeout)]
-      (if (<= timeout 1)
-        (let [reset-entity (update-component entity :cloning #(update-in % [:cloning/timeout] (constantly max-timeout)))
-              cloned-entity1 (create-entity [(aging 21)])
-              cloned-entity2 (create-entity (aging 21))]
-          (make-entity-update reset-entity [cloned-entity1 cloned-entity2] nil))
-        (update-component entity :cloning #(update-in % [:cloning/timeout] dec))
-        )))
-
-  (def moving-system (create-system "Moving"
-                                    update-position
-                                    (contains-all-components? [:position])))
-
-  (def drawable-system (create-system "Drawable"
-                                      nil
-                                      (contains-all-components? [:score])))
-
-  (def aging-system (create-system "Aging"
-                                   update-aging
-                                   (contains-all-components? [:aging])))
-
-  (def cloning-system (create-system "Cloning"
-                                     update-cloning
-                                     (contains-all-components? [:cloning])))
-
-
-  (def entity1 (create-entity [(position 0 0)
-                               (score 0)
-                               (cloning 10)]))
-
-  (def entity2 (create-entity [(position 1 1)
-                               (aging 10)]))
-  (def entity3 (create-entity [(position 1 0)
-                               (aging 3)]))
-
-  (def entity4 (create-entity [(position 0 1)
-                               (aging 7)]))
-
-  (def world0 (create-world))
-  (def world1 (-> world0
-                  (add-system moving-system)
-                  (add-system drawable-system)
-                  (add-system aging-system)
-                  (add-system cloning-system)))
-
-  (def world2 (-> world1 (add-entities [entity1]) (add-entities [entity1 entity2 entity3])))
-
-  (def current-world (atom world2))
-
-  (defn n-updates! [n]
-    (doseq [i (range 0 n)]
-      (swap! current-world game-loop))
-    @current-world)
-
-  )
+(defn system-managed-entities [world system-name]
+  (let [systems (:world/systems world)
+        system (->> systems
+                    (filter #(= (:system/name %) system-name))
+                    first)
+        _ (when (not system)
+            (log/warn "system-managed-entities Can't find system-name" system-name))
+        system-id (:system/id system)
+        entity-ids (get-in world [:world/lookups system-id :lookup/entity-ids])
+        entities (map #(get-in world [:world/entities %]) entity-ids)
+        ]
+    entities))
