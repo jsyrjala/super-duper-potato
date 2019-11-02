@@ -158,7 +158,7 @@
                                b-rel-velocity)]
     (if (and shoots
              (> (- now last-shot) 200))
-      (let [bullet (entities/create-bullet position b-velocity direction)
+      (let [bullet (entities/create-bullet now position b-velocity direction)
             new-entity (system/update-component entity :shooter
                                                 #(assoc %
                                                    :shooter/last-shot now))]
@@ -170,6 +170,22 @@
     :shooting-system
     #(shooting-update %1 %2 %3)
     (system/contains-all-components? [:shooter])
+    ))
+
+(defn aging-update [world system entity]
+  (let [aging-c (system/first-component entity :aging)
+        now (:world/loop-timestamp world)
+        death-time (:aging/death-time aging-c)]
+    (if (< now death-time)
+      entity
+      (system/make-entity-update nil nil entity)
+      )))
+
+(def aging-system
+  (system/create-system
+    :aging-system
+    #(aging-update %1 %2 %3)
+    (system/contains-all-components? [:aging])
     ))
 
 (defn named [name]
@@ -192,11 +208,6 @@
 
 (def player (entities/create-player (vector/vector2 40 30)))
 
-;; TODO
-(def bullet (entities/create-bullet (vector/vector2 1 2)
-                                    (vector/vector2 0.1 0.1)
-                                    0))
-
 (defn rand-pos []
   [(+ 20 (rand-int 350)) (+ 20 (rand-int 350))])
 
@@ -205,8 +216,6 @@
    (entities/create-asteroid (rand-pos) [-0.1 0.01] 4 0.02)
    (entities/create-asteroid (rand-pos) [-0.05 -0.01] 0 0.02)
    (entities/create-asteroid (rand-pos) [0.05 -0.01] 1 0.03)
-
-   bullet
 
    player
    ])
@@ -219,6 +228,7 @@
                  drawable-system
                  moving-system
                  wrap-around-system
+                 aging-system
                  ]]
     (-> (reduce system/add-system world systems)
         (system/add-entities
