@@ -141,12 +141,12 @@
                              #(assoc %
                                 :position/position new-position))))
 
-(def wrap-around-system
+(defn wrap-around-system [config]
   (system/create-system
     :wrap-around-system
     #(wrap-around-update %1 %2 %3)
     (system/contains-all-components? [:position :wrap-around])
-    {:wrap-around/bounding-box [50.0 50.0 300.0 300.0]}))
+    {:wrap-around/bounding-box (:bounding-box config)}))
 
 (defn shooting-update [world system entity]
   (let [shooter-c (system/first-component entity :shooter)
@@ -331,21 +331,22 @@
     #(health-update %1 %2 %3)
     (system/contains-all-components? [:health])))
 
-(defn rand-pos []
-  [(+ 20 (rand-int 350)) (+ 20 (rand-int 350))])
+(defn rand-pos [[max-x max-y]]
+  [(rand-int max-x) (rand-int max-y)])
 
-(def entities
-  [(entities/create-asteroid (rand-pos) [0.05 0.05] 7 -0.005 20.0)
-   (entities/create-asteroid (rand-pos) [0.1 0.1] 7 -0.005 20.0)
-   (entities/create-asteroid (rand-pos) [0.1 0.1] 7 0.01 15.0)
-   (entities/create-asteroid (rand-pos) [-0.1 0.01] 4 0.03 10.0)
-   (entities/create-asteroid (rand-pos) [-0.15 -0.11] 0 -0.03 10.0)
-   (entities/create-asteroid (rand-pos) [0.15 -0.11] 1 0.03 10.0)
+(defn init-entities [config]
+  (let [screen-size (:screen-size config)]
+    [(entities/create-asteroid (rand-pos screen-size) [0.05 0.05] 7 -0.005 20.0)
+     (entities/create-asteroid (rand-pos screen-size) [0.1 0.1] 7 -0.005 20.0)
+     (entities/create-asteroid (rand-pos screen-size) [0.1 0.1] 7 0.01 15.0)
+     (entities/create-asteroid (rand-pos screen-size) [-0.1 0.01] 4 0.03 10.0)
+     (entities/create-asteroid (rand-pos screen-size) [-0.15 -0.11] 0 -0.03 10.0)
+     (entities/create-asteroid (rand-pos screen-size) [0.15 -0.11] 1 0.03 10.0)
 
-   (entities/create-player (vector/vector2 40 30))
-   ])
+     (entities/create-player (vector/scale screen-size 0.5))
+     ]))
 
-(defn init-world []
+(defn init-world [config]
   (let [world (system/create-world)
         systems [gravity-system
                  keyboard-system
@@ -355,11 +356,11 @@
                  moving-system
                  collider-system
                  collider-handler-system
-                 wrap-around-system
+                 (wrap-around-system config)
                  aging-system
                  health-system
                  ]]
     (-> (reduce system/add-system world systems)
         (system/add-entities
-          entities))
+          (init-entities config)))
     ))

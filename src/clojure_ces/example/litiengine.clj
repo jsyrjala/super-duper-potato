@@ -15,17 +15,18 @@
     (render [^Graphics2D g]
       (render-fn g))))
 
-(defn start-engine [args draw-fn]
+(defn start-engine [args draw-fn config]
   (log/info "start" args)
   (Game/init (into-array String args))
   (input/register-key-handlers)
   (let [window (Game/window)
         icon (ImageIO/read (jio/resource "asteroid.png"))
-        taskbar (Taskbar/getTaskbar)]
+        taskbar (Taskbar/getTaskbar)
+        [w h] (:screen-size config)]
     (.setIconImage window icon)
     (.setIconImage taskbar icon)
     (.setTitle window "super-duper-potato!")
-    (.setResolution window (Resolution/custom 400 400 "4x3")))
+    (.setResolution window (Resolution/custom w h "4x3")))
 
   (log/info "init done")
   (Game/addGameListener (reify GameListener
