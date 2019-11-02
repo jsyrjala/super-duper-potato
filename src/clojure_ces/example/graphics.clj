@@ -26,11 +26,29 @@
         (.draw g (new Line2D$Double (+ tx x), (+ ty y), (+ x rx), (+ y ry))))
       )))
 
-(defn draw-asteroid [^Graphics2D g world entity]
+(defn draw-big-asteroid [^Graphics2D g world entity]
   (let [position (system/first-component entity :position)
         [^double x ^double y] (:position/position position)
         direction (:position/direction position)
-        points [[-10.0 -10.0] [10.0 -10.0] [10.0 10.0] [-10.0 10.0]]
+        points [[-15.0 -15.0] [15.0 -15.0] [15.0 15.0] [-15.0 15.0]]
+        points (map #(vector/rotate % direction) points)
+        poly (Polygon.)]
+    (doseq [[px py] points]
+      (.addPoint poly (+ x px) (+ y py)))
+    (.setColor g Color/RED)
+    (.draw g poly)
+    ))
+
+(defn draw-asteroid [^Graphics2D g world entity]
+  (let [position (system/first-component entity :position)
+        size-c (system/first-component entity :size)
+        radius (:size/radius size-c)
+        [^double x ^double y] (:position/position position)
+        direction (:position/direction position)
+        points [[(- radius) (- radius)]
+                [radius (- radius)]
+                [radius radius]
+                [(- radius) radius]]
         points (map #(vector/rotate % direction) points)
         poly (Polygon.)]
     (doseq [[px py] points]

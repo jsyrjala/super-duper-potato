@@ -63,6 +63,10 @@
 (defn wrap-around []
   {:component/type :wrap-around})
 
+(defn size [radius]
+  {:component/type :size
+   :size/radius     (or radius 10)})
+
 ;; entities
 
 (defn create-player [pos]
@@ -79,14 +83,17 @@
      (wrap-around)
      (score 0 3)]))
 
-(defn create-asteroid [pos velocity direction angular-velocity]
+
+;; :asteroid :big-asteroid
+(defn create-asteroid [pos velocity direction angular-velocity radius]
   (system/create-entity
     [(named :asteroid)
      (position pos direction)
+     (size radius)
      (movement velocity (vector/vector2 0 0) angular-velocity 2.0)
      (drawable :asteroid)
      (collider)
-     (health 5)
+     (health (int (+ (/ radius 5) 3)))
      (wrap-around)
      ]))
 

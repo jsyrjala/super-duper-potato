@@ -244,11 +244,13 @@
         asteroids (groups :asteroid)
         collisions (for [bullet bullets]
                      (for [asteroid asteroids]
-                       (let [b-pos-c (system/first-component bullet :position)
+                       (let [size-c (system/first-component asteroid :size)
+                             radius (:size/radius size-c)
+                             b-pos-c (system/first-component bullet :position)
                              b-pos (:position/position b-pos-c)
                              a-pos-c (system/first-component asteroid :position)
                              a-pos (:position/position a-pos-c)]
-                         (when (< (vector/distance b-pos a-pos) 10)
+                         (when (< (vector/distance b-pos a-pos) radius)
                            {:bullet bullet :asteroid asteroid}))
                 ))
         collisions (filter identity (flatten collisions))]
@@ -311,10 +313,12 @@
   [(+ 20 (rand-int 350)) (+ 20 (rand-int 350))])
 
 (def entities
-  [(entities/create-asteroid (rand-pos) [0.1 0.1] 7 0.01 )
-   (entities/create-asteroid (rand-pos) [-0.1 0.01] 4 0.02)
-   (entities/create-asteroid (rand-pos) [-0.05 -0.01] 0 0.02)
-   (entities/create-asteroid (rand-pos) [0.05 -0.01] 1 0.03)
+  [(entities/create-asteroid (rand-pos) [0.05 0.05] 7 -0.005 20.0)
+   (entities/create-asteroid (rand-pos) [0.1 0.1] 7 -0.005 20.0)
+   (entities/create-asteroid (rand-pos) [0.1 0.1] 7 0.01 15.0)
+   (entities/create-asteroid (rand-pos) [-0.1 0.01] 4 0.03 10.0)
+   (entities/create-asteroid (rand-pos) [-0.15 -0.11] 0 -0.03 10.0)
+   (entities/create-asteroid (rand-pos) [0.15 -0.11] 1 0.03 10.0)
 
    (entities/create-player (vector/vector2 40 30))
    ])
