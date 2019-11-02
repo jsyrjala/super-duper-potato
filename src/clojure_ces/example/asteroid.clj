@@ -2,7 +2,8 @@
   (:require [clojure-ces.system :as system]
             [clojure-ces.example.vector :as vector]
             [clojure.tools.logging :as log]
-            [clojure-ces.example.input :as input])
+            [clojure-ces.example.input :as input]
+            [clojure-ces.example.entities :as entities])
   )
 
 (defn zero-gravity-update [world system entity component]
@@ -91,6 +92,7 @@
         left (keys 37)
         right (keys 39)
         up (keys 38)
+        position (:position/position position-c)
         direction (:position/direction position-c)
         speed 0.05
         new-direction (cond (and left right) direction
@@ -101,23 +103,27 @@
                                        (vector/scale
                                          (vector/rotate [0.0 -1.0] new-direction)
                                          0.05))
-                        :else acceleration)]
+                        :else acceleration)
+        new-entity (-> entity
+                       (system/update-component :position
+                                                #(assoc %
+                                                   :position/direction new-direction))
+                       (system/update-component :movement
+                                                #(assoc %
+                                                   :movement/acceleration new-accel))
 
-    (-> entity
-        (system/update-component :position
-                                 #(assoc %
-                                    :position/direction new-direction))
-        (system/update-component :movement
-                                 #(assoc %
-                                    :movement/acceleration new-accel))
-
-        )))
+                       )
+        bullet (when space
+                 (entities/create-bullet position [0 0] direction))
+        ]
+      (system/make-entity-update new-entity bullet nil)
+    ))
 
 (def keyboard-system
   (system/create-system
     :keyboard-system
     #(keyboad-controller %1 %2 %3)
-    (system/contains-all-components? [:controlled :position])))
+    (system/contains-all-components? [:controlled :shooter :position])))
 
 (defn wrap-around-update [world system entity]
   (let [position-c (system/first-component entity :position)
@@ -166,6 +172,10 @@
 (defn controlled []
   {:component/type :controlled})
 
+(defn shooter []
+  {:component/type    :shooter
+   :shooter/last-shot 0})
+
 ;; entities
 (def player (system/create-entity
               [(named "player")
@@ -173,6 +183,7 @@
                (position (vector/vector2 40 30) 0)
                (movement (vector/vector2 0 0) (vector/vector2 0 0))
                (drawable :player)
+               (shooter)
                (score 0 3)]))
 
 
@@ -182,23 +193,15 @@
                (movement (vector/vector2 0.1 0.1) (vector/vector2 0 0))
                (drawable :bullet)]))
 
-(defn create-asteroid [pos velocity direction angular-velocity]
-  (system/create-entity
-    [(named "asteroid")
-     (position pos direction)
-     (movement velocity (vector/vector2 0 0) angular-velocity)
-     (drawable :asteroid)
-     ])
-  )
 
 (defn rand-pos []
   [(+ 20 (rand-int 350)) (+ 20 (rand-int 350))])
 
 (def entities
-  [(create-asteroid (rand-pos) [0.1 0.1] 7 0.01 )
-   (create-asteroid (rand-pos) [-0.1 0.01] 4 0.02)
-   (create-asteroid (rand-pos) [-0.05 -0.01] 0 0.02)
-   (create-asteroid (rand-pos) [0.05 -0.01] 1 0.03)
+  [(entities/create-asteroid (rand-pos) [0.1 0.1] 7 0.01 )
+   (entities/create-asteroid (rand-pos) [-0.1 0.01] 4 0.02)
+   (entities/create-asteroid (rand-pos) [-0.05 -0.01] 0 0.02)
+   (entities/create-asteroid (rand-pos) [0.05 -0.01] 1 0.03)
 
    bullet
 
