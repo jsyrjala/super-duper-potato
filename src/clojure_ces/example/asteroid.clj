@@ -115,6 +115,12 @@
                        (system/update-component :shooter
                                                 #(assoc %
                                                    :shooter/shoots (boolean space)))
+                       (system/update-component :controlled
+                                                #(assoc %
+                                                   :controlled/left (boolean left)
+                                                   :controlled/right (boolean right)
+                                                   :controlled/thrust (boolean up)
+                                                   :controlled/shoot (boolean space)))
                        )
         ]
     new-entity
@@ -188,25 +194,37 @@
     (system/contains-all-components? [:aging])
     ))
 
-(defn named [name]
-  {:component/type :named
-   :named/name     name})
+(defn engine-update [world system entity]
+  (let [controlled-c (system/first-component entity :controlled)
+        thrust (:controlled/thrust controlled-c)]
+    (if (not thrust)
+      entity
+      (let [now (:world/loop-timestamp world)
+            position-c (system/first-component entity :position)
+            movement-c (system/first-component entity :movement)
+            direction (:position/direction position-c)
+            position (:position/position position-c)
+            position (vector/add position (vector/rotate [0 8] direction))
+            velocity (:movement/velocity movement-c)
+            particle-dir (+ direction (rand 0.3) -0.1)
+            b-rel-velocity (vector/scale
+                             (vector/rotate [0 1]
+                                            particle-dir)
+                             2)
+            b-velocity (vector/add velocity
+                                   b-rel-velocity)
 
-(defn position [pos direction]
-  {:component/type     :position
-   :position/position  pos
-   :position/direction direction})
+            particle (entities/create-particle now position b-velocity direction
+                                               (rand-int 300))]
+        (system/make-entity-update entity particle nil))
+      )))
 
-(defn movement
-  ([velocity acceleration]
-   (movement velocity acceleration 0.0))
-  ([velocity acceleration angular-velocity]
-   {:component/type            :movement
-    :movement/velocity         velocity
-    :movement/acceleration     acceleration
-    :movement/angular-velocity angular-velocity}))
-
-(def player (entities/create-player (vector/vector2 40 30)))
+(def engine-system
+  (system/create-system
+    :engine-system
+    #(engine-update %1 %2 %3)
+    (system/contains-all-components? [:controlled :position])
+    ))
 
 (defn rand-pos []
   [(+ 20 (rand-int 350)) (+ 20 (rand-int 350))])
@@ -217,13 +235,14 @@
    (entities/create-asteroid (rand-pos) [-0.05 -0.01] 0 0.02)
    (entities/create-asteroid (rand-pos) [0.05 -0.01] 1 0.03)
 
-   player
+   (entities/create-player (vector/vector2 40 30))
    ])
 
 (defn init-world []
   (let [world (system/create-world)
         systems [gravity-system
                  keyboard-system
+                 engine-system
                  shooting-system
                  drawable-system
                  moving-system

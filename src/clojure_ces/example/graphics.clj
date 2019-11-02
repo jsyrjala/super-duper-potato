@@ -6,7 +6,7 @@
            (java.awt.geom Line2D$Double Rectangle2D$Double)))
 
 
-(defn draw-player [^Graphics2D g entity]
+(defn draw-player [^Graphics2D g world entity]
   (let [position (system/first-component entity :position)
         [^double x ^double y] (:position/position position)]
     (when position
@@ -22,7 +22,7 @@
         (.draw g (new Line2D$Double (+ tx x), (+ ty y), (+ x rx), (+ y ry))))
       )))
 
-(defn draw-asteroid [^Graphics2D g entity]
+(defn draw-asteroid [^Graphics2D g world entity]
   (let [position (system/first-component entity :position)
         [^double x ^double y] (:position/position position)
         direction (:position/direction position)
@@ -36,7 +36,7 @@
   ))
 
 
-(defn draw-bullet [^Graphics2D g entity]
+(defn draw-bullet [^Graphics2D g world entity]
   (let [position (system/first-component entity :position)
         [^double x ^double y] (:position/position position)
         direction (:position/direction position)
@@ -49,23 +49,41 @@
     (.draw g poly)
     ))
 
-(defn draw-entity [^Graphics2D g entity]
+(defn draw-particle [^Graphics2D g world entity]
+  (let [position (system/first-component entity :position)
+        now (double (:world/loop-timestamp world))
+        [^double x ^double y] (:position/position position)
+        aging (system/first-component entity :aging)
+        death-time (double (:aging/death-time aging))
+        birth-time (double (:aging/birth-time aging))
+        frac (int
+               (* 255.0
+                  (/ (- death-time now)
+                     (- death-time birth-time))))
+        color (Color. frac, frac, frac)]
+    (.setColor g color)
+    (.draw g (Rectangle2D$Double. x y 1.0 1.0))
+    ))
+
+(defn draw-entity [^Graphics2D g world entity]
  (let [position (system/first-component entity :position)
        [^double x ^double y] (:position/position position)]
    (.setColor g Color/RED)
-   (.draw g (Rectangle2D$Double. x y 20.0 30.0))
+   (.draw g (Rectangle2D$Double. x y 10.0 10.0))
    ))
 
 (def sprites {:player draw-player
               :asteroid draw-asteroid
               :bullet draw-bullet
+              :particle draw-particle
               :default draw-entity})
 
 
 (defn draw-things [^Graphics2D g world]
   (swap! world system/game-loop)
 
-  (let [entities (system/system-managed-entities @world :drawable-system)]
+  (let [current-world @world
+        entities (system/system-managed-entities current-world :drawable-system)]
     ;; TODO this is totally in wrong place?
 
     (doseq [entity entities]
@@ -73,7 +91,7 @@
             sprite (:drawable/sprite drawable)
             draw-fn (get sprites sprite draw-entity)]
         (when draw-fn
-          (draw-fn g entity))))
+          (draw-fn g current-world entity))))
 
     ;; https://stackoverflow.com/questions/18684220/why-is-java-application-running-smoother-when-moving-mouse-over-it-video-includ
     (.sync (Toolkit/getDefaultToolkit))
