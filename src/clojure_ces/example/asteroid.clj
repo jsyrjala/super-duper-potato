@@ -288,8 +288,28 @@
                    (vector/rotate [1 0] direction)
                    (rand 3.0))
         age (rand-int 1000)]
-    (entities/create-particle now pos velocity direction age)
+    (entities/create-particle now pos velocity direction age)))
+
+(defn create-new-asteroid [pos radius]
+  (let [direction (rand 20.0)
+        velocity (vector/scale
+                   (vector/rotate [1 0] direction)
+                   (rand 1))
+        angular-velocity (- (rand 0.06) 0.03)]
+    (entities/create-asteroid pos velocity direction angular-velocity radius)
     ))
+
+(defn create-child-asteroids [asteroid]
+  (let [pos-c (system/first-component asteroid :position)
+        pos (:position/position pos-c)
+        size-c (system/first-component asteroid :size)
+        radius (:size/radius size-c)]
+    (cond (< radius 11) []
+          (< radius 16) (map (fn [_] (create-new-asteroid pos 10.0)) (range 4))
+          (< radius 21) (map (fn [_] (create-new-asteroid pos 15.0)) (range 3))
+          (< radius 31) (map (fn [_] (create-new-asteroid pos 20.0)) (range 2))
+          :else (map (fn [_] (create-new-asteroid pos 30.0)) (range 2))
+          )))
 
 (defn health-update [world system entity]
   (let [now (:world/loop-timestamp world)
@@ -299,8 +319,10 @@
         hitpoints (:health/hit-points health-c)]
     (if (< hitpoints 1)
       (let [particles (map (fn [_] (create-random-particle now pos))
-                           (range 30))]
-        (system/make-entity-update nil particles entity))
+                           (range 30))
+            asteroids (create-child-asteroids entity)
+            new-entities (concat particles asteroids)]
+        (system/make-entity-update nil new-entities entity))
       entity)))
 
 (def health-system
