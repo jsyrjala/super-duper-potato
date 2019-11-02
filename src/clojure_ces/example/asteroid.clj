@@ -25,37 +25,30 @@
     (assoc component :position/position
                      (vector/add position velocity))))
 
-
+(defn zero-gravity-update [world system entity component]
+  (assoc component :movement/acceleration [0.0 0.0]))
 
 (defn point-gravity-update [world system entity component]
   (let [position-c (system/first-component entity :position)
         position (:position/position position-c)
-        velocity (:movement/velocity component)
-        speed (vector/length velocity)
         center (:gravity/center system)
         min-distance (:gravity/min-distance system)
-        e-name (:named/name (system/first-component entity :named))
         mass (* 100 (:gravity/mass system))
         entity-mass 1.0
         dist (max min-distance (vector/distance position center))
         force (/ (* entity-mass mass) (* dist dist))
         direction (vector/add position (vector/negate center))
         unit-direction (vector/normalize direction)
-        change (vector/clamp (vector/negate (vector/scale unit-direction force)) 5.0)
-        ]
-    (when (= e-name "player")
-      (log/info e-name "gravity" position "s=" speed "d=" dist "f=" force change))
+        change (vector/clamp (vector/negate (vector/scale unit-direction force)) 5.0)]
     (assoc component :movement/acceleration change)))
 
 (defn constant-gravity-update [world system entity component]
-  (let [acceleration (:movement/acceleration component)
-        force (:gravity/constant-force system)]
-    ;;(log/info "position update" (:entity/id entity) component)
+  (let [force (:gravity/constant-force system)]
     (assoc component :movement/acceleration force)))
 
 (defn gravity-update [world system entity component]
-  ;;component
-  (constant-gravity-update world system entity component)
+  (zero-gravity-update world system entity component)
+  ;; (constant-gravity-update world system entity component)
   ;; (point-gravity-update world system entity component)
   )
 
@@ -82,10 +75,9 @@
         position (:position/position position-c)
         velocity (:movement/velocity movement)
         acceleration (:movement/acceleration movement)
-        ;; _ (log/info "pos" position "vel" velocity "acc" acceleration)
-        new-velocity (vector/add velocity acceleration)
+        new-velocity (vector/clamp (vector/add velocity acceleration)
+                                   2.0)
         new-position (vector/add position new-velocity)
-        ;;_ (log/info "pos" new-position "vel" new-velocity)
         ]
     (-> entity
         (system/update-component :position
@@ -107,18 +99,33 @@
 
 (defn keyboad-controller [world system entity]
   (let [position-c (system/first-component entity :position)
+        movement-c (system/first-component entity :movement)
+        acceleration (:movement/acceleration movement-c)
         keys @input/keys-down
         left (keys 37)
         right (keys 39)
+        up (keys 38)
         direction (:position/direction position-c)
-        speed 0.1
+        speed 0.05
         new-direction (cond (and left right) direction
                             left (- direction speed)
                             right (+ direction speed)
-                            :else direction)]
-    (system/update-component entity :position
-                             #(assoc %
-                                :position/direction new-direction))))
+                            :else direction)
+        new-accel (cond up (vector/add acceleration
+                                       (vector/scale
+                                         (vector/rotate [0.0 -1.0] new-direction)
+                                         0.05))
+                        :else acceleration)]
+
+    (-> entity
+        (system/update-component :position
+                                 #(assoc %
+                                    :position/direction new-direction))
+        (system/update-component :movement
+                                 #(assoc %
+                                    :movement/acceleration new-accel))
+
+        )))
 
 (def keyboard-system
   (system/create-system
@@ -179,9 +186,9 @@
 
 (defn init-world []
   (let [world (system/create-world)
-        systems [keyboard-system
+        systems [gravity-system
+                 keyboard-system
                  drawable-system
-                 ;;gravity-system
                  moving-system]]
     (-> (reduce system/add-system world systems)
         (system/add-entities
