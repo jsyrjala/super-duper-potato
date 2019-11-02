@@ -82,6 +82,9 @@
 (defn asteroid-spawner []
   {:component/type :asteroid-spawner})
 
+(defn singleton []
+  {:component/type :singleton})
+
 (defn create-text-display [now pos text]
   (system/create-entity
     [(named :text-display)
@@ -144,4 +147,11 @@
      (movement velocity (vector/vector2 0 0) 0 6.0)
      (drawable :particle)
      (aging now max-age)
+     ]))
+
+(defn create-singleton []
+  (system/create-entity
+    [(named :singleton)
+     (singleton)
+     (score 0 0)
      ]))

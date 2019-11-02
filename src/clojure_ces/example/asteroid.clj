@@ -84,7 +84,7 @@
     (system/contains-all-components? [:movement :position])))
 
 
-(defn keyboad-controller [world system entity]
+(defn keyboard-controller [world system entity]
   (let [position-c (system/first-component entity :position)
         movement-c (system/first-component entity :movement)
         acceleration (:movement/acceleration movement-c)
@@ -93,7 +93,6 @@
         left (keys 37)
         right (keys 39)
         up (keys 38)
-        r-key (keys 52)
         position (:position/position position-c)
         direction (:position/direction position-c)
         speed 0.06
@@ -127,11 +126,30 @@
     new-entity
     ))
 
-(def keyboard-system
+(def keyboard-controller-system
+  (system/create-system
+    :keyboard-controller-system
+    #(keyboard-controller %1 %2 %3)
+    (system/contains-all-components? [:controlled :shooter :position])))
+
+(defn keyboard-update [config world system _]
+  (let [player (system/system-managed-entities world :keyboard-controller-system)
+        keys @input/keys-down
+        r-key (keys 82)]
+    (if (and (not (seq player))
+             r-key)
+      (let [screen-size (:screen-size config)
+            player (entities/create-player (vector/scale screen-size 0.5))]
+        (log/info "Creating a new player")
+        (system/make-entity-update nil player nil))
+      nil)))
+
+(defn keyboard-system [config]
+  (log/info "init kb system")
   (system/create-system
     :keyboard-system
-    #(keyboad-controller %1 %2 %3)
-    (system/contains-all-components? [:controlled :shooter :position])))
+    #(keyboard-update config %1 %2 %3)
+    (system/contains-all-components? [:singleton])))
 
 (defn wrap-around-update [world system entity]
   (let [position-c (system/first-component entity :position)
@@ -390,7 +408,9 @@
         slow 0.5
         medium 1.0
         fast 1.5]
-    [(entities/create-asteroid (rand-pos screen-size) (rand-velocity slow) 7 -0.005 20.0)
+    [(entities/create-singleton)
+
+     (entities/create-asteroid (rand-pos screen-size) (rand-velocity slow) 7 -0.005 20.0)
      (entities/create-asteroid (rand-pos screen-size) (rand-velocity slow) 7 -0.005 20.0)
 
      (entities/create-asteroid (rand-pos screen-size) (rand-velocity medium) 7 0.01 15.0)
@@ -409,7 +429,8 @@
 (defn init-world [config]
   (let [world (system/create-world)
         systems [gravity-system
-                 keyboard-system
+                 keyboard-controller-system
+                 (keyboard-system config)
                  engine-system
                  shooting-system
                  drawable-system
