@@ -137,6 +137,23 @@
     keyboad-controller
     (system/contains-all-components? [:controlled :position])))
 
+(defn wrap-around-update [world system entity]
+  (let [position-c (system/first-component entity :position)
+        position (:position/position position-c)
+        bounding-box (:wrap-around/bounding-box system)
+        new-position (vector/wrap-around position bounding-box)]
+    (log/info "wrap" position)
+    (system/update-component entity :position
+                             #(assoc %
+                                :position/position new-position))))
+
+(def wrap-around-system
+  (system/create-system
+    "WrapAround"
+    #(wrap-around-update %1 %2 %3)
+    (system/contains-all-components? [:position])
+    {:wrap-around/bounding-box [50.0 50.0 300.0 300.0]}))
+
 (defn named [name]
   {:component/type :named
    :named/name     name})
@@ -192,18 +209,37 @@
                  (drawable :asteroid)
                  ]))
 
+(defn create-asteroid [pos velocity direction angular-velocity]
+  (system/create-entity
+    [(named "asteroid")
+     (position pos direction)
+     (movement velocity (vector/vector2 0 0) angular-velocity)
+     (drawable :asteroid)
+     ])
+  )
+
+(def entities
+  [(create-asteroid [100 100] [0.1 0.1] 7 0.01 )
+   (create-asteroid [100 200] [-0.1 0.01] 4 0.02)
+   (create-asteroid [200 200] [-0.05 -0.01] 0 0.02)
+   (create-asteroid [200 100] [0.05 -0.01] 1 0.03)
+
+   bullet
+
+   player
+   ])
+
 (defn init-world []
   (let [world (system/create-world)
         systems [gravity-system
                  keyboard-system
                  drawable-system
-                 moving-system]]
+                 moving-system
+                 wrap-around-system
+                 ]]
     (-> (reduce system/add-system world systems)
         (system/add-entities
-          [player
-           asteroid
-           bullet
-           ]))
+          entities))
     ))
 
 

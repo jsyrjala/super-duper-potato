@@ -52,3 +52,18 @@
         s (Math/sin rad)]
     [(- (* x c) (* y s))
      (+ (* x s) (* y c))]))
+
+(defn wrap-around [v bounding-box]
+  (let [[min-x min-y max-x max-y] bounding-box
+        [x y] v
+        width (- max-x min-x)
+        height (- max-y min-y)
+        ;; TODO v could be multiple screenfulls avay..
+        new-x (cond (< x min-x) (+ x width)
+                    (> x max-x) (- x width)
+                    :else x)
+        new-y (cond (< y min-x) (+ y height)
+                    (> y max-x) (- y height)
+                    :else y)]
+    [new-x new-y]
+    ))
