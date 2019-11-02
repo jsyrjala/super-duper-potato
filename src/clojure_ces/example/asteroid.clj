@@ -33,7 +33,8 @@
         position (:position/position position-c)
         center (:gravity/center system)
         min-distance (:gravity/min-distance system)
-        mass (* 100 (:gravity/mass system))
+        min-distance 30
+        mass (* 50.0 (:gravity/mass system))
         entity-mass 1.0
         dist (max min-distance (vector/distance position center))
         force (/ (* entity-mass mass) (* dist dist))
@@ -48,8 +49,8 @@
 
 (defn gravity-update [world system entity component]
   (zero-gravity-update world system entity component)
-  ;; (constant-gravity-update world system entity component)
-  ;; (point-gravity-update world system entity component)
+  ;;(constant-gravity-update world system entity component)
+  ;;(point-gravity-update world system entity component)
   )
 
 
@@ -62,11 +63,11 @@
 (def gravity-system
   (system/create-system
     "Gravity"
-    (system/update-component-with :movement gravity-update)
+    (system/update-component-with :movement #(gravity-update %1 %2 %3 %4))
     (system/contains-all-components? [:movement :position])
     {:gravity/constant-force [0 0.1]
-     :gravity/center         [0.0 0.0]
-     :gravity/min-distance   10
+     :gravity/center         [200.0 200.0]
+     :gravity/min-distance   2
      :gravity/mass           1.0}))
 
 (defn newton-update [world system entity]
@@ -97,7 +98,7 @@
 (def moving-system
   (system/create-system
     "Movable"
-    newton-update
+    #(newton-update %1 %2 %3)
     (system/contains-all-components? [:movement :position])))
 
 
@@ -106,6 +107,7 @@
         movement-c (system/first-component entity :movement)
         acceleration (:movement/acceleration movement-c)
         keys @input/keys-down
+        space (keys 32)
         left (keys 37)
         right (keys 39)
         up (keys 38)
@@ -134,7 +136,7 @@
 (def keyboard-system
   (system/create-system
     "Keyboard"
-    keyboad-controller
+    #(keyboad-controller %1 %2 %3)
     (system/contains-all-components? [:controlled :position])))
 
 (defn wrap-around-update [world system entity]
@@ -142,7 +144,6 @@
         position (:position/position position-c)
         bounding-box (:wrap-around/bounding-box system)
         new-position (vector/wrap-around position bounding-box)]
-    (log/info "wrap" position)
     (system/update-component entity :position
                              #(assoc %
                                 :position/position new-position))))
@@ -218,11 +219,14 @@
      ])
   )
 
+(defn rand-pos []
+  [(+ 20 (rand-int 350)) (+ 20 (rand-int 350))])
+
 (def entities
-  [(create-asteroid [100 100] [0.1 0.1] 7 0.01 )
-   (create-asteroid [100 200] [-0.1 0.01] 4 0.02)
-   (create-asteroid [200 200] [-0.05 -0.01] 0 0.02)
-   (create-asteroid [200 100] [0.05 -0.01] 1 0.03)
+  [(create-asteroid (rand-pos) [0.1 0.1] 7 0.01 )
+   (create-asteroid (rand-pos) [-0.1 0.01] 4 0.02)
+   (create-asteroid (rand-pos) [-0.05 -0.01] 0 0.02)
+   (create-asteroid (rand-pos) [0.05 -0.01] 1 0.03)
 
    bullet
 

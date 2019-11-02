@@ -1,4 +1,5 @@
-(ns clojure-ces.system)
+(ns clojure-ces.system
+  (:require [clojure.tools.logging :as log]))
 
 
 (def next-id
@@ -286,7 +287,11 @@
           new-components (components-updater components component-type component-update-fn)
           new-entity (assoc entity :entity/components new-components)
           update-command (make-entity-update new-entity)]
-      update-command
+      (if update-command
+        update-command
+        (do
+          (log/warn "update-with-command: returned nil update command")
+          (make-entity-update entity)))
       )))
 
 
