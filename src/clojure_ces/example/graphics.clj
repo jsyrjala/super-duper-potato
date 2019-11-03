@@ -2,7 +2,7 @@
   (:require [clojure-ces.system :as system]
             [clojure.tools.logging :as log]
             [clojure-ces.example.vector :as vector])
-  (:import (java.awt Graphics2D Color Toolkit BasicStroke Polygon Font)
+  (:import (java.awt Graphics2D Color Polygon)
            (java.awt.geom Line2D$Double Rectangle2D$Double)))
 
 
@@ -11,22 +11,18 @@
   )
 
 (defn draw-text [^Graphics2D g world entity]
-  (let [position (system/first-component entity :position)
-        [^double x ^double y] (:position/position position)
-        text-display (system/first-component entity :text-display)
-        ^String text (:text-display/text text-display)]
+  (let [[^double x ^double y] (system/component-value entity :position/position)
+        ^String text (system/component-value entity :text-display/text)]
     (.setColor g Color/WHITE)
     (.drawString g text x y)
     ))
 
 (defn draw-player [^Graphics2D g world entity]
-  (let [position (system/first-component entity :position)
-        [^double x ^double y] (:position/position position)
-        score (-> (system/first-component entity :score)
-                  :score/current-score)]
-    (when position
+  (let [[^double x ^double y] (system/component-value entity :position/position)
+        score (system/component-value entity :score/current-score)]
+    (when x
       (.setColor g Color/YELLOW)
-      (let [direction (:position/direction position)
+      (let [direction (system/component-value entity :position/direction)
             top [0 -5.0]
             [tx ty] (vector/rotate top direction)
             left [5.0 10.0]
@@ -54,12 +50,10 @@
 
 (defn draw-asteroid [^Graphics2D g world entity]
   (let [now (:world/loop-timestamp world)
-        position (system/first-component entity :position)
-        size-c (system/first-component entity :size)
         flasher-c (system/first-component entity :flasher)
-        radius (:size/radius size-c)
-        [^double x ^double y] (:position/position position)
-        direction (:position/direction position)
+        radius (system/component-value entity :size/radius)
+        [^double x ^double y] (system/component-value entity :position/position)
+        direction (system/component-value entity :position/direction)
         points [[(- radius) (- radius)]
                 [radius (- radius)]
                 [radius radius]
@@ -74,9 +68,8 @@
 
 
 (defn draw-bullet [^Graphics2D g world entity]
-  (let [position (system/first-component entity :position)
-        [^double x ^double y] (:position/position position)
-        direction (:position/direction position)
+  (let [[^double x ^double y] (system/component-value entity :position/position)
+        direction (system/component-value entity :position/direction)
         points [[-0.5 -0.5] [0.5 -0.5] [0.5 0.5] [-0.5 0.5]]
         points (map #(vector/rotate % direction) points)
         poly (Polygon.)]
@@ -87,9 +80,8 @@
     ))
 
 (defn draw-particle [^Graphics2D g world entity]
-  (let [position (system/first-component entity :position)
-        now (double (:world/loop-timestamp world))
-        [^double x ^double y] (:position/position position)
+  (let [now (double (:world/loop-timestamp world))
+        [^double x ^double y] (system/component-value entity :position/position)
         aging (system/first-component entity :aging)
         death-time (double (:aging/death-time aging))
         birth-time (double (:aging/birth-time aging))
@@ -103,8 +95,7 @@
     ))
 
 (defn draw-entity [^Graphics2D g world entity]
- (let [position (system/first-component entity :position)
-       [^double x ^double y] (:position/position position)]
+ (let [[^double x ^double y] (system/component-value entity :position/position)]
    (.setColor g Color/RED)
    (.draw g (Rectangle2D$Double. x y 10.0 10.0))
    ))
@@ -119,12 +110,11 @@
 (def first-time (atom true))
 
 (defn draw-things [^Graphics2D g world]
-
   (let [current-world @world
         entities (system/system-managed-entities current-world :drawable-system)]
 
     (when @first-time
-      ;; first text render takes couple of seconds because app is loading fonts
+      (log/info "The first text render takes couple of seconds because app is loading fonts")
       (.drawString g " " -10 -10)
       (swap! first-time (constantly false)))
 
@@ -139,7 +129,7 @@
     ;; https://stackoverflow.com/questions/18684220/why-is-java-application-running-smoother-when-moving-mouse-over-it-video-includ
     ;;(.sync (Toolkit/getDefaultToolkit))
     ;; TODO this is totally in wrong place?
-    ;; TOOD separate thread?
+    ;; TODO separate thread?
     (swap! world system/game-loop)
     ))
 
