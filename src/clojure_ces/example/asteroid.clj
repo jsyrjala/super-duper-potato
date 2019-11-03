@@ -357,13 +357,16 @@
         asteroid-spawner (system/first-component entity :asteroid-spawner)
         game-stopper (system/first-component entity :game-stopper)
         pos (system/component-value entity :position/position)
-        hitpoints (system/component-value entity :health/hit-points)]
+        hitpoints (system/component-value entity :health/hit-points)
+        score (system/component-value entity :score/current-score)]
     (if (< hitpoints 1)
       (let [particles (map (fn [_] (create-random-particle now pos))
                            (range 30))
             asteroids (when asteroid-spawner (create-child-asteroids entity))
-            text (when game-stopper [(entities/create-text-display now [20 20] "You died! You suck! Press R to retry.")])
-            new-entities (concat particles asteroids text)]
+            message (str "You died! You suck! Your score was pathetic " score ". Press R to retry.")
+            text-display (when game-stopper [(entities/create-text-display
+                                               now [20 20] message)])
+            new-entities (concat particles asteroids text-display)]
         (system/make-entity-update nil new-entities entity))
       entity)))
 
