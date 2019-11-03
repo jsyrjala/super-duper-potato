@@ -259,12 +259,28 @@
   (fn [component]
     (= (:component/type component) type)))
 
+;; TODO there could be multiple versions of the same
+;; kind of component, this returns only the first one of them
 (defn first-component
   "Return the first component of matching type"
   [entity type]
   (->> (-> entity :entity/components)
        (filter (for-component-type type))
        first))
+
+;; TODO there could be multiple versions of the same
+;; kind of component, this returns only the first one of them
+(defn component-value
+  "Return a value from the first component of matching type."
+  ([entity value-id]
+   (let [component-ns (namespace value-id)
+         _ (when (not component-ns)
+             (log/warn "Wrong params: " value-id "is missing namespace"))
+         component-type (keyword component-ns)]
+     (component-value entity component-type value-id)))
+  ([entity component-type value-id]
+   (let [component (first-component entity component-type)]
+     (get component value-id))))
 
 (defn components-updater [components component-type update-fn]
   (vec (map #(component-updater %

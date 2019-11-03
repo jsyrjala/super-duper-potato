@@ -10,8 +10,7 @@
   (assoc component :movement/acceleration [0.0 0.0]))
 
 (defn point-gravity-update [world system entity component]
-  (let [position-c (system/first-component entity :position)
-        position (:position/position position-c)
+  (let [position (system/component-value entity :position/position)
         center (:gravity/center system)
         min-distance (:gravity/min-distance system)
         min-distance 30
@@ -84,17 +83,17 @@
     (system/contains-all-components? [:movement :position])))
 
 
+;; TODO this is attached to the player
+;; player dies -> this doesn't get called
+;; TODO maybe this only take commands, and somebody else should apply then?
 (defn keyboard-controller [world system entity]
-  (let [position-c (system/first-component entity :position)
-        movement-c (system/first-component entity :movement)
-        acceleration (:movement/acceleration movement-c)
+  (let [acceleration (system/component-value entity :movement/acceleration)
+        direction (system/component-value entity :position/direction)
         keys @input/keys-down
         space (keys 32)
         left (keys 37)
         right (keys 39)
         up (keys 38)
-        position (:position/position position-c)
-        direction (:position/direction position-c)
         speed 0.06
         new-direction (cond (and left right) direction
                             left (- direction speed)
@@ -152,8 +151,7 @@
     (system/contains-all-components? [:singleton])))
 
 (defn wrap-around-update [world system entity]
-  (let [position-c (system/first-component entity :position)
-        position (:position/position position-c)
+  (let [position (system/component-value entity :position/position)
         bounding-box (:wrap-around/bounding-box system)
         new-position (vector/wrap-around position bounding-box)]
     (system/update-component entity :position
@@ -168,19 +166,16 @@
     {:wrap-around/bounding-box (:bounding-box config)}))
 
 (defn shooting-update [world system entity]
-  (let [shooter-c (system/first-component entity :shooter)
-        shoots (:shooter/shoots shooter-c)
-        now (:world/loop-timestamp world)
+  (let [now (:world/loop-timestamp world)
+        shooter-c (system/first-component entity :shooter)
+        shoots (system/component-value entity :shooter/shoots)
         last-shot (:shooter/last-shot shooter-c)
         position-c (system/first-component entity :position)
-        movement-c (system/first-component entity :movement)
         position (:position/position position-c)
         direction (:position/direction position-c)
-        velocity (:movement/velocity movement-c)
-        b-rel-velocity (vector/scale (vector/rotate [0 -1] direction)
-                                     2)
-        b-velocity (vector/add velocity
-                               b-rel-velocity)]
+        velocity (system/component-value entity :movement/velocity)
+        b-rel-velocity (vector/scale (vector/rotate [0 -1] direction) 2.0)
+        b-velocity (vector/add velocity b-rel-velocity)]
     (if (and shoots
              (> (- now last-shot) 200))
       (let [bullet (entities/create-bullet now position b-velocity direction)
@@ -194,28 +189,23 @@
   (system/create-system
     :shooting-system
     #(shooting-update %1 %2 %3)
-    (system/contains-all-components? [:shooter])
-    ))
+    (system/contains-all-components? [:shooter])))
 
 (defn aging-update [world system entity]
-  (let [aging-c (system/first-component entity :aging)
-        now (:world/loop-timestamp world)
-        death-time (:aging/death-time aging-c)]
+  (let [now (:world/loop-timestamp world)
+        death-time (system/component-value entity :aging/death-time)]
     (if (< now death-time)
       entity
-      (system/make-entity-update nil nil entity)
-      )))
+      (system/make-entity-update nil nil entity))))
 
 (def aging-system
   (system/create-system
     :aging-system
     #(aging-update %1 %2 %3)
-    (system/contains-all-components? [:aging])
-    ))
+    (system/contains-all-components? [:aging])))
 
 (defn engine-update [world system entity]
-  (let [controlled-c (system/first-component entity :controlled)
-        thrust (:controlled/thrust controlled-c)]
+  (let [thrust (system/component-value entity :controlled/thrust)]
     (if (not thrust)
       entity
       (let [now (:world/loop-timestamp world)
@@ -250,8 +240,7 @@
   (:named/name (system/first-component entity :named)))
 
 (defn register-hit [now damage entity]
-  (let [health-c (system/first-component entity :health)
-        hitpoints (:health/hit-points health-c)]
+  (let [hitpoints (system/component-value entity :health/hit-points)]
     (-> entity
         (system/update-component :health
                                  #(assoc %
@@ -262,31 +251,27 @@
                                     :flasher/end (+ now 500)))
         )))
 
+;; TODO this is attached to player
+;; => if player dies -> no collisions
 (defn collider-handler-update [world system player]
   (let [now (:world/loop-timestamp world)
         entities (system/system-managed-entities world :collider-system)
         groups (group-by get-entity-name entities)
         bullets (groups :bullet)
         asteroids (groups :asteroid)
-        collisions (for [bullet bullets]
-                     (for [asteroid asteroids]
-                       (let [size-c (system/first-component asteroid :size)
-                             radius (:size/radius size-c)
-                             b-pos-c (system/first-component bullet :position)
-                             b-pos (:position/position b-pos-c)
-                             a-pos-c (system/first-component asteroid :position)
-                             a-pos (:position/position a-pos-c)]
-                         (when (< (vector/distance b-pos a-pos) radius)
-                           {:bullet bullet :asteroid asteroid}))
-                ))
+        collisions (for [asteroid asteroids]
+                     (let [a-radius (system/component-value asteroid :size/radius)
+                           a-pos (system/component-value asteroid :position/position)]
+                       (for [bullet bullets]
+                         (let [b-pos (system/component-value bullet :position/position)]
+                           (when (< (vector/distance b-pos a-pos) a-radius)
+                             {:bullet bullet :asteroid asteroid}))
+                         )))
+        player-pos (system/component-value player :position/position)
         player-collisions (for [asteroid asteroids]
-                            (let [size-c (system/first-component asteroid :size)
-                                  radius (:size/radius size-c)
-                                  a-pos-c (system/first-component asteroid :position)
-                                  a-pos (:position/position a-pos-c)
-                                  p-pos-c (system/first-component player :position)
-                                  p-pos (:position/position p-pos-c)]
-                              (when (< (vector/distance p-pos a-pos) (+ radius 5))
+                            (let [a-radius (system/component-value asteroid :size/radius)
+                                  a-pos (system/component-value asteroid :position/position)]
+                              (when (< (vector/distance player-pos a-pos) (+ a-radius 5))
                                 {:player player :asteroid asteroid})
                               ))
         collisions (concat collisions player-collisions)
@@ -301,9 +286,7 @@
             player-hit (->> collisions
                             (map :player)
                             (filter identity)
-                            first
-
-                            )
+                            first)
             new-player (if player-hit
                          (register-hit now 1 player)
                          player)
@@ -323,6 +306,7 @@
 
 ;; TODO very ugly
 ;; attached to the player
+;; TODO attach to singleton
 (def collider-handler-system
   (system/create-system
     :collider-handler-system
@@ -359,10 +343,8 @@
     ))
 
 (defn create-child-asteroids [asteroid]
-  (let [pos-c (system/first-component asteroid :position)
-        pos (:position/position pos-c)
-        size-c (system/first-component asteroid :size)
-        radius (or (:size/radius size-c) 10)]
+  (let [pos (system/component-value asteroid :position/position)
+        radius (system/component-value asteroid :size/radius)]
     (cond (< radius 11) [(create-new-asteroid [-15 -15] 20.0)]
           (< radius 16) (map (fn [_] (create-new-asteroid pos 10.0)) (range 4))
           (< radius 21) (map (fn [_] (create-new-asteroid pos 15.0)) (range 3))
@@ -372,13 +354,10 @@
 
 (defn health-update [world system entity]
   (let [now (:world/loop-timestamp world)
-        health-c (system/first-component entity :health)
-        pos-c (system/first-component entity :position)
         asteroid-spawner (system/first-component entity :asteroid-spawner)
         game-stopper (system/first-component entity :game-stopper)
-        pos (:position/position pos-c)
-        hitpoints (:health/hit-points health-c)
-        ]
+        pos (system/component-value entity :position/position)
+        hitpoints (system/component-value entity :health/hit-points)]
     (if (< hitpoints 1)
       (let [particles (map (fn [_] (create-random-particle now pos))
                            (range 30))
